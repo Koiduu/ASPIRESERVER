@@ -44,6 +44,34 @@ public class PlotRegion {
         );
     }
 
+    public Location getSafeCenter() {
+        World world = Bukkit.getWorld(worldName);
+        if (world == null) return null;
+
+        double cx = (minX + maxX) / 2.0 + 0.5;
+        double cz = (minZ + maxZ) / 2.0 + 0.5;
+
+        for (int y = minY + 1; y <= maxY - 1; y++) {
+            Block feet = world.getBlockAt((int) cx, y, (int) cz);
+            Block head = world.getBlockAt((int) cx, y + 1, (int) cz);
+            Block below = world.getBlockAt((int) cx, y - 1, (int) cz);
+            if (feet.getType() == Material.AIR && head.getType() == Material.AIR
+                && below.getType() != Material.AIR) {
+                return new Location(world, cx, y, cz);
+            }
+        }
+
+        for (int y = maxY; y >= minY + 1; y--) {
+            Block feet = world.getBlockAt((int) cx, y, (int) cz);
+            Block head = world.getBlockAt((int) cx, y + 1, (int) cz);
+            if (feet.getType() == Material.AIR && head.getType() == Material.AIR) {
+                return new Location(world, cx, y, cz);
+            }
+        }
+
+        return new Location(world, cx, minY + 1.0, cz);
+    }
+
     public void clear() {
         World world = Bukkit.getWorld(worldName);
         if (world == null) return;

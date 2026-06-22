@@ -1,12 +1,13 @@
 package com.aspireserver.buildbattle.voting;
 
 public enum VoteRating {
-    SUPER_POOP(1),
-    POOP(2),
-    OKAY(3),
-    GOOD(4),
-    EPIC(5),
-    LEGENDARY(6);
+    F(1),
+    D(2),
+    E(3),
+    C(4),
+    B(5),
+    A(6),
+    S(7);
 
     private final int score;
 
@@ -22,6 +23,6 @@ public enum VoteRating {
         for (VoteRating rating : values()) {
             if (rating.score == score) return rating;
         }
-        return OKAY;
+        return C;
     }
 }

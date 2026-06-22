@@ -101,6 +101,7 @@ public class ArenaManager {
 
     public void saveArena(Arena arena) {
         String path = "arenas." + arena.getId();
+        arenasConfig.set(path, null);
         arenasConfig.set(path + ".world", arena.getWorldName());
 
         if (arena.getLobbySpawn() != null) {

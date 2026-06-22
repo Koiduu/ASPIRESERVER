@@ -27,6 +27,12 @@ public class Arena {
         plots.add(plot);
     }
 
+    public boolean removePlot(int index) {
+        if (index < 0 || index >= plots.size()) return false;
+        plots.remove(index);
+        return true;
+    }
+
     public String getId() {
         return id;
     }

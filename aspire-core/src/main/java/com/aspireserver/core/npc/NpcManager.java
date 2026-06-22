@@ -88,6 +88,8 @@ public class NpcManager {
 
         removeNpcEntity(npc);
 
+        loc.getChunk().load();
+
         Villager villager = (Villager) loc.getWorld().spawnEntity(loc, EntityType.VILLAGER);
         villager.setAI(false);
         villager.setInvulnerable(true);
@@ -99,6 +101,7 @@ public class NpcManager {
         villager.customName(Component.text(npc.getDisplayName(), NamedTextColor.GOLD));
         villager.setCustomNameVisible(true);
         villager.setProfession(Villager.Profession.NITWIT);
+        villager.addScoreboardTag("aspire_npc_" + npc.getId());
 
         npc.setEntityUuid(villager.getUniqueId());
         entityNpcMap.put(villager.getUniqueId(), npc.getId());
@@ -111,19 +114,29 @@ public class NpcManager {
         label.setMarker(true);
         label.customName(Component.text("[" + npc.getAction().getDisplayName() + "]", NamedTextColor.YELLOW));
         label.setCustomNameVisible(true);
+        label.addScoreboardTag("aspire_npc_label_" + npc.getId());
     }
 
     private void removeNpcEntity(NpcData npc) {
-        if (npc.getEntityUuid() != null && npc.getLocation() != null && npc.getLocation().getWorld() != null) {
-            for (Entity entity : npc.getLocation().getWorld().getEntities()) {
-                if (entity.getUniqueId().equals(npc.getEntityUuid())) {
-                    entity.remove();
-                }
-                if (entity instanceof ArmorStand && entity.getLocation().distanceSquared(npc.getLocation()) < 2) {
-                    entity.remove();
-                }
-            }
+        Location loc = npc.getLocation();
+        if (loc == null || loc.getWorld() == null) return;
+
+        if (npc.getEntityUuid() != null) {
             entityNpcMap.remove(npc.getEntityUuid());
+        }
+
+        for (Entity entity : loc.getWorld().getEntities()) {
+            if (npc.getEntityUuid() != null && entity.getUniqueId().equals(npc.getEntityUuid())) {
+                entity.remove();
+                continue;
+            }
+            if (entity.getScoreboardTags().contains("aspire_npc_" + npc.getId())) {
+                entity.remove();
+                continue;
+            }
+            if (entity.getScoreboardTags().contains("aspire_npc_label_" + npc.getId())) {
+                entity.remove();
+            }
         }
     }
 
@@ -145,8 +158,23 @@ public class NpcManager {
 
     public NpcData getNpcByEntity(UUID entityUuid) {
         String id = entityNpcMap.get(entityUuid);
-        if (id == null) return null;
-        return npcs.get(id);
+        if (id != null) return npcs.get(id);
+
+        Entity entity = Bukkit.getEntity(entityUuid);
+        if (entity != null) {
+            for (String tag : entity.getScoreboardTags()) {
+                if (tag.startsWith("aspire_npc_") && !tag.startsWith("aspire_npc_label_")) {
+                    String npcId = tag.substring("aspire_npc_".length());
+                    NpcData npc = npcs.get(npcId);
+                    if (npc != null) {
+                        npc.setEntityUuid(entityUuid);
+                        entityNpcMap.put(entityUuid, npcId);
+                        return npc;
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     public NpcData getNpc(String id) {
