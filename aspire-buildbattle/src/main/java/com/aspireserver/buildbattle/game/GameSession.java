@@ -13,6 +13,7 @@ import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.scoreboard.*;
 
 import java.time.Duration;
 import java.util.*;
@@ -32,6 +33,7 @@ public class GameSession {
     private BukkitTask lobbyTask;
     private VoteManager voteManager;
     private String theme;
+    private final Map<UUID, Scoreboard> playerScoreboards;
 
     private static final List<String> THEMES = List.of(
         "Castle", "Underwater Temple", "Spaceship", "Medieval Village",
@@ -48,6 +50,7 @@ public class GameSession {
         this.playerPlotAssignments = new HashMap<>();
         this.teams = new HashMap<>();
         this.players = new LinkedHashSet<>();
+        this.playerScoreboards = new HashMap<>();
         this.state = GameState.WAITING;
         this.timeRemaining = gameMode.getDurationSeconds();
         this.lobbyCountdown = plugin.getConfig().getInt("lobby-countdown", 60);
@@ -71,6 +74,7 @@ public class GameSession {
 
     public void removePlayer(UUID player) {
         players.remove(player);
+        removeScoreboard(player);
         if (teams.containsKey(player)) {
             UUID partner = teams.remove(player);
             teams.remove(partner);
@@ -86,7 +90,6 @@ public class GameSession {
 
     public void startLobbyCountdown() {
         if (state != GameState.WAITING) return;
-        state = GameState.WAITING;
 
         lobbyTask = new BukkitRunnable() {
             @Override
@@ -117,14 +120,12 @@ public class GameSession {
                     return;
                 }
 
-                if (lobbyCountdown <= 10 || lobbyCountdown == 30 || lobbyCountdown == 60) {
-                    for (UUID uuid : players) {
-                        Player p = Bukkit.getPlayer(uuid);
-                        if (p != null) {
-                            p.sendActionBar(Component.text("Game starts in " + lobbyCountdown + "s | " + players.size() + " players", NamedTextColor.YELLOW));
-                            if (lobbyCountdown <= 5) {
-                                p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 1f, 1f);
-                            }
+                for (UUID uuid : players) {
+                    Player p = Bukkit.getPlayer(uuid);
+                    if (p != null) {
+                        p.sendActionBar(Component.text("Game starts in " + lobbyCountdown + "s | " + players.size() + " players", NamedTextColor.YELLOW));
+                        if (lobbyCountdown <= 5) {
+                            p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 1f, 1f);
                         }
                     }
                 }
@@ -146,9 +147,13 @@ public class GameSession {
         for (UUID uuid : players) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
-                int plotIndex = playerPlotAssignments.get(uuid);
+                Integer plotIndex = playerPlotAssignments.get(uuid);
+                if (plotIndex == null) continue;
                 PlotRegion plot = arena.getPlots().get(plotIndex);
-                player.teleport(plot.getCenter());
+                Location spawnLoc = plot.getSafeCenter();
+                if (spawnLoc != null) {
+                    player.teleport(spawnLoc);
+                }
                 player.sendMessage(Component.text("Theme: ", NamedTextColor.GOLD)
                     .append(Component.text(theme, NamedTextColor.YELLOW)));
                 player.showTitle(Title.title(
@@ -157,6 +162,7 @@ public class GameSession {
                     Title.Times.times(Duration.ofMillis(500), Duration.ofSeconds(3), Duration.ofMillis(500))
                 ));
                 player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1f, 1f);
+                setupScoreboard(player);
             }
         }
 
@@ -166,6 +172,7 @@ public class GameSession {
 
     private void assignPlots() {
         List<PlotRegion> plots = arena.getPlots();
+        if (plots.isEmpty()) return;
         int plotIndex = 0;
 
         if (gameMode.isTeamMode()) {
@@ -180,15 +187,75 @@ public class GameSession {
                 }
                 assigned.add(player);
                 plotIndex++;
-                if (plotIndex >= plots.size()) break;
+                if (plotIndex >= plots.size()) plotIndex = 0;
             }
         } else {
             for (UUID player : players) {
                 playerPlotAssignments.put(player, plotIndex);
                 plotIndex++;
-                if (plotIndex >= plots.size()) break;
+                if (plotIndex >= plots.size()) plotIndex = 0;
             }
         }
+    }
+
+    private void setupScoreboard(Player player) {
+        ScoreboardManager manager = Bukkit.getScoreboardManager();
+        Scoreboard board = manager.getNewScoreboard();
+        Objective obj = board.registerNewObjective("bb_game", Criteria.DUMMY,
+            Component.text("BUILD BATTLE", NamedTextColor.GOLD));
+        obj.setDisplaySlot(DisplaySlot.SIDEBAR);
+
+        obj.getScore("").setScore(6);
+        obj.getScore("§eTheme:").setScore(5);
+        obj.getScore("§f" + theme).setScore(4);
+        obj.getScore(" ").setScore(3);
+        obj.getScore("§eTime Left:").setScore(2);
+        obj.getScore("§f" + formatTime(timeRemaining)).setScore(1);
+
+        player.setScoreboard(board);
+        playerScoreboards.put(player.getUniqueId(), board);
+    }
+
+    private void updateScoreboards() {
+        for (UUID uuid : players) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player == null) continue;
+
+            Scoreboard board = playerScoreboards.get(uuid);
+            if (board == null) continue;
+
+            board.getEntries().forEach(board::resetScores);
+
+            Objective obj = board.getObjective("bb_game");
+            if (obj == null) continue;
+
+            obj.getScore("").setScore(6);
+            obj.getScore("§eTheme:").setScore(5);
+            obj.getScore("§f" + theme).setScore(4);
+            obj.getScore(" ").setScore(3);
+            obj.getScore("§eTime Left:").setScore(2);
+            obj.getScore("§f" + formatTime(timeRemaining)).setScore(1);
+        }
+    }
+
+    private void removeScoreboard(UUID uuid) {
+        playerScoreboards.remove(uuid);
+        Player player = Bukkit.getPlayer(uuid);
+        if (player != null) {
+            player.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
+        }
+    }
+
+    private void removeAllScoreboards() {
+        for (UUID uuid : new HashSet<>(playerScoreboards.keySet())) {
+            removeScoreboard(uuid);
+        }
+    }
+
+    private String formatTime(int seconds) {
+        int min = seconds / 60;
+        int sec = seconds % 60;
+        return String.format("%d:%02d", min, sec);
     }
 
     private void startTimer() {
@@ -203,15 +270,17 @@ public class GameSession {
 
                 if (timeRemaining <= 0) {
                     cancel();
+                    removeAllScoreboards();
                     startVoting();
                     return;
                 }
 
-                if (timeRemaining <= 10 || timeRemaining == 30 || timeRemaining == 60) {
+                updateScoreboards();
+
+                if (timeRemaining <= 10) {
                     for (UUID uuid : players) {
                         Player player = Bukkit.getPlayer(uuid);
                         if (player != null) {
-                            player.sendActionBar(Component.text("Time remaining: " + timeRemaining + "s", NamedTextColor.YELLOW));
                             if (timeRemaining <= 5) {
                                 player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1f, 1f);
                             }
@@ -233,6 +302,7 @@ public class GameSession {
     public void end(Map<UUID, Integer> scores) {
         state = GameState.ENDING;
         cancelTasks();
+        removeAllScoreboards();
 
         UUID winner = null;
         int highestScore = -1;
@@ -274,6 +344,7 @@ public class GameSession {
     public void forceEnd() {
         state = GameState.ENDING;
         cancelTasks();
+        removeAllScoreboards();
 
         for (UUID uuid : new HashSet<>(players)) {
             Player player = Bukkit.getPlayer(uuid);
@@ -337,4 +408,5 @@ public class GameSession {
     public String getTheme() { return theme; }
     public int getTimeRemaining() { return timeRemaining; }
     public int getLobbyCountdown() { return lobbyCountdown; }
+    public VoteManager getVoteManager() { return voteManager; }
 }

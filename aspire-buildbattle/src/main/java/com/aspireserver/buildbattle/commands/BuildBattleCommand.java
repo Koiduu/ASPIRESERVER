@@ -71,6 +71,28 @@ public class BuildBattleCommand implements CommandExecutor, TabCompleter {
                 forceStart(player, mode);
             }
             case "status" -> showStatus(player);
+            case "removeplot" -> {
+                if (!player.hasPermission("aspire.buildbattle.admin")) {
+                    player.sendMessage(Component.text("No permission!", NamedTextColor.RED));
+                    return true;
+                }
+                if (args.length < 3) {
+                    player.sendMessage(Component.text("Usage: /bb removeplot <arenaId> <plotIndex>", NamedTextColor.RED));
+                    return true;
+                }
+                handleRemovePlot(player, args[1], args[2]);
+            }
+            case "listplots" -> {
+                if (!player.hasPermission("aspire.buildbattle.admin")) {
+                    player.sendMessage(Component.text("No permission!", NamedTextColor.RED));
+                    return true;
+                }
+                if (args.length < 2) {
+                    player.sendMessage(Component.text("Usage: /bb listplots <arenaId>", NamedTextColor.RED));
+                    return true;
+                }
+                handleListPlots(player, args[1]);
+            }
             default -> sendUsage(player);
         }
         return true;
@@ -158,6 +180,41 @@ public class BuildBattleCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    private void handleRemovePlot(Player player, String arenaId, String indexStr) {
+        Arena arena = plugin.getArenaManager().getArena(arenaId);
+        if (arena == null) {
+            player.sendMessage(Component.text("Arena not found!", NamedTextColor.RED));
+            return;
+        }
+        int index;
+        try {
+            index = Integer.parseInt(indexStr);
+        } catch (NumberFormatException e) {
+            player.sendMessage(Component.text("Invalid plot index!", NamedTextColor.RED));
+            return;
+        }
+        if (arena.removePlot(index)) {
+            plugin.getArenaManager().saveArena(arena);
+            player.sendMessage(Component.text("Plot " + index + " removed from arena '" + arenaId + "'. (" + arena.getPlots().size() + " remaining)", NamedTextColor.GREEN));
+        } else {
+            player.sendMessage(Component.text("Invalid plot index! Arena has " + arena.getPlots().size() + " plots (0-" + (arena.getPlots().size() - 1) + ")", NamedTextColor.RED));
+        }
+    }
+
+    private void handleListPlots(Player player, String arenaId) {
+        Arena arena = plugin.getArenaManager().getArena(arenaId);
+        if (arena == null) {
+            player.sendMessage(Component.text("Arena not found!", NamedTextColor.RED));
+            return;
+        }
+        player.sendMessage(Component.text("--- Plots for '" + arenaId + "' (" + arena.getPlots().size() + ") ---", NamedTextColor.GOLD));
+        for (int i = 0; i < arena.getPlots().size(); i++) {
+            var plot = arena.getPlots().get(i);
+            player.sendMessage(Component.text("  [" + i + "] " + plot.getMinX() + "," + plot.getMinY() + "," + plot.getMinZ()
+                + " -> " + plot.getMaxX() + "," + plot.getMaxY() + "," + plot.getMaxZ(), NamedTextColor.GRAY));
+        }
+    }
+
     private GameMode parseMode(String input) {
         return switch (input.toLowerCase()) {
             case "solo" -> GameMode.SOLO;
@@ -173,18 +230,25 @@ public class BuildBattleCommand implements CommandExecutor, TabCompleter {
         player.sendMessage(Component.text("/bb join <mode> - Join a game", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/bb leave - Leave current game", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/bb status - View active games", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/bb listplots <arena> - List plots", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/bb removeplot <arena> <index> - Remove a plot", NamedTextColor.GRAY));
         player.sendMessage(Component.text("Modes: solo, teams, prosolo, proteams", NamedTextColor.GRAY));
     }
 
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         if (args.length == 1) {
-            return List.of("join", "leave", "start", "status").stream()
+            return List.of("join", "leave", "start", "status", "removeplot", "listplots").stream()
                 .filter(s -> s.startsWith(args[0].toLowerCase())).toList();
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("join") || args[0].equalsIgnoreCase("start"))) {
             return List.of("solo", "teams", "prosolo", "proteams").stream()
                 .filter(s -> s.startsWith(args[1].toLowerCase())).toList();
+        }
+        if (args.length == 2 && (args[0].equalsIgnoreCase("removeplot") || args[0].equalsIgnoreCase("listplots"))) {
+            return plugin.getArenaManager().getArenas().stream()
+                .map(a -> a.getId())
+                .filter(s -> s.toLowerCase().startsWith(args[1].toLowerCase())).toList();
         }
         return List.of();
     }
