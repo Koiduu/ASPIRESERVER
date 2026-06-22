@@ -1,0 +1,29 @@
+# AspireSMP Configuration
+
+# Default claim limit for new players (in blocks)
+default-claim-limit: 150
+
+# Tier 1 upgrade
+tier1:
+  cost: 1
+  cost-material: NETHERITE_INGOT
+  limit: 250
+
+# Tier 2 upgrade
+tier2:
+  cost: 5
+  cost-material: NETHERITE_INGOT
+  limit: 500
+
+# Graveyard settings
+graveyard:
+  # Graveyard expires after X hours (-1 for never)
+  expire-hours: -1
+  # Block used for tombstone
+  tombstone-block: SOUL_LANTERN
+
+# One-player sleep
+one-player-sleep: true
+
+# Claim visualizer tool
+visualizer-tool: GOLDEN_SHOVEL

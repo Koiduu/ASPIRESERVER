@@ -1,0 +1,25 @@
+name: AspireCreative
+version: '1.0.0'
+main: com.aspireserver.creative.AspireCreative
+api-version: '1.21'
+description: Creative plot world with tier system
+author: Aspire Team
+depend: [AspireCore]
+softdepend: [FastAsyncWorldEdit, WorldEdit, AxiomPaper]
+load: STARTUP
+
+commands:
+  plot:
+    description: Creative plot commands
+    usage: /plot <claim|home|clear|dispose|add|remove|list|info>
+
+permissions:
+  aspire.creative.plot:
+    description: Use creative plot system
+    default: true
+  aspire.creative.large:
+    description: Claim large plots
+    default: op
+  aspire.admin.bypass:
+    description: Bypass all plot protections
+    default: op

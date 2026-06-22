@@ -1,0 +1,76 @@
+name: AspireCore
+version: '1.0.0'
+main: com.aspireserver.core.AspireCore
+api-version: '1.21'
+description: Core network module for Aspire Server
+author: Aspire Team
+
+commands:
+  party:
+    description: Party system
+    usage: /party <player|subcommand>
+  p:
+    description: Party alias
+    usage: /p <player|subcommand>
+  pc:
+    description: Party chat shortcut
+    usage: /pc <message>
+  friend:
+    description: Friend system
+    usage: /friend <player|subcommand>
+  f:
+    description: Friend alias
+    usage: /f <player|subcommand>
+  lobby:
+    description: Teleport to lobby
+    usage: /lobby
+  l:
+    description: Lobby alias
+    usage: /l
+  ban:
+    description: Ban a player
+    usage: /ban <player> <reason>
+    permission: aspire.admin.ban
+  tempban:
+    description: Temporarily ban a player
+    usage: /tempban <player> <duration> <reason>
+    permission: aspire.admin.tempban
+  mute:
+    description: Mute a player
+    usage: /mute <player> <duration>
+    permission: aspire.admin.mute
+  kick:
+    description: Kick a player
+    usage: /kick <player> [reason]
+    permission: aspire.admin.kick
+  warn:
+    description: Warn a player
+    usage: /warn <player> <reason>
+    permission: aspire.admin.warn
+  sc:
+    description: Toggle staff chat
+    usage: /sc
+    permission: aspire.admin.staffchat
+
+permissions:
+  aspire.admin.ban:
+    description: Allows banning players
+    default: op
+  aspire.admin.tempban:
+    description: Allows temp-banning players
+    default: op
+  aspire.admin.mute:
+    description: Allows muting players
+    default: op
+  aspire.admin.kick:
+    description: Allows kicking players
+    default: op
+  aspire.admin.warn:
+    description: Allows warning players
+    default: op
+  aspire.admin.staffchat:
+    description: Access to staff chat
+    default: op
+  aspire.admin.bypass:
+    description: Bypass all restrictions
+    default: op

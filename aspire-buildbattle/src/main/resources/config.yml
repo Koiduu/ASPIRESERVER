@@ -1,0 +1,18 @@
+# AspireBuildBattle Configuration
+
+# Minimum players to auto-start
+min-players:
+  solo: 2
+  teams: 4
+  pro-solo: 2
+  pro-teams: 4
+
+# Entity limits per plot
+max-entities-per-plot: 5
+max-heads-per-plot: 15
+
+# Voting time per plot (seconds)
+vote-time-per-plot: 15
+
+# Countdown before game starts (seconds)
+start-countdown: 3
