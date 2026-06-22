@@ -51,6 +51,10 @@ commands:
     description: Toggle staff chat
     usage: /sc
     permission: aspire.admin.staffchat
+  npc:
+    description: NPC management
+    usage: /npc <create|edit|remove|movehere|list>
+    permission: aspire.admin.npc
 
 permissions:
   aspire.admin.ban:
@@ -73,4 +77,7 @@ permissions:
     default: op
   aspire.admin.bypass:
     description: Bypass all restrictions
+    default: op
+  aspire.admin.npc:
+    description: NPC management
     default: op

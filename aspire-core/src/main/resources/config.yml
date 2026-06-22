@@ -10,3 +10,16 @@ lobby:
 
 # Auto-kick after X warnings
 auto-kick-warnings: 3
+
+# Warp destinations for NPCs
+warps:
+  smp:
+    world: "world"
+    x: 0.5
+    y: 100.0
+    z: 0.5
+  creative:
+    world: "creative_small"
+    x: 0.5
+    y: 65.0
+    z: 0.5

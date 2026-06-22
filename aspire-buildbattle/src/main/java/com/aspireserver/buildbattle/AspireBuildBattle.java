@@ -3,6 +3,7 @@ package com.aspireserver.buildbattle;
 import com.aspireserver.buildbattle.arena.ArenaManager;
 import com.aspireserver.buildbattle.commands.BuildBattleCommand;
 import com.aspireserver.buildbattle.commands.PlotSetCommand;
+import com.aspireserver.buildbattle.commands.SpawnSetWaitingCommand;
 import com.aspireserver.buildbattle.listeners.AntiGriefListener;
 import com.aspireserver.buildbattle.listeners.PlotToolListener;
 import com.aspireserver.buildbattle.listeners.PlayerListener;
@@ -44,6 +45,9 @@ public final class AspireBuildBattle extends JavaPlugin {
 
         PlotSetCommand plotSetCmd = new PlotSetCommand(this);
         getCommand("plotset").setExecutor(plotSetCmd);
+
+        SpawnSetWaitingCommand waitingCmd = new SpawnSetWaitingCommand(this);
+        getCommand("spawnsetwaiting").setExecutor(waitingCmd);
     }
 
     private void registerListeners() {

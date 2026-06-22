@@ -8,6 +8,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -26,7 +27,9 @@ public class GameSession {
     private final Set<UUID> players;
     private GameState state;
     private int timeRemaining;
+    private int lobbyCountdown;
     private BukkitTask timerTask;
+    private BukkitTask lobbyTask;
     private VoteManager voteManager;
     private String theme;
 
@@ -47,10 +50,18 @@ public class GameSession {
         this.players = new LinkedHashSet<>();
         this.state = GameState.WAITING;
         this.timeRemaining = gameMode.getDurationSeconds();
+        this.lobbyCountdown = plugin.getConfig().getInt("lobby-countdown", 60);
     }
 
     public void addPlayer(UUID player) {
         players.add(player);
+        Player p = Bukkit.getPlayer(player);
+        if (p != null) {
+            Location waitingLobby = plugin.getArenaManager().getWaitingLobby();
+            if (waitingLobby != null) {
+                p.teleport(waitingLobby);
+            }
+        }
     }
 
     public void addTeam(UUID player1, UUID player2) {
@@ -64,16 +75,72 @@ public class GameSession {
             UUID partner = teams.remove(player);
             teams.remove(partner);
         }
+        if (players.isEmpty() && state != GameState.ENDING) {
+            forceEnd();
+        }
     }
 
     public boolean hasPlayer(UUID player) {
         return players.contains(player);
     }
 
+    public void startLobbyCountdown() {
+        if (state != GameState.WAITING) return;
+        state = GameState.WAITING;
+
+        lobbyTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (players.isEmpty()) {
+                    cancel();
+                    forceEnd();
+                    return;
+                }
+
+                if (lobbyCountdown <= 0) {
+                    cancel();
+                    int minPlayers = gameMode.isTeamMode()
+                        ? plugin.getConfig().getInt("min-players." + gameMode.name().toLowerCase().replace("_", "-"), 4)
+                        : plugin.getConfig().getInt("min-players." + gameMode.name().toLowerCase().replace("_", "-"), 2);
+                    if (players.size() >= minPlayers) {
+                        start();
+                    } else {
+                        for (UUID uuid : new HashSet<>(players)) {
+                            Player p = Bukkit.getPlayer(uuid);
+                            if (p != null) {
+                                p.sendMessage(Component.text("Not enough players! Game cancelled.", NamedTextColor.RED));
+                                p.teleport(arena.getLobbySpawn());
+                            }
+                        }
+                        forceEnd();
+                    }
+                    return;
+                }
+
+                if (lobbyCountdown <= 10 || lobbyCountdown == 30 || lobbyCountdown == 60) {
+                    for (UUID uuid : players) {
+                        Player p = Bukkit.getPlayer(uuid);
+                        if (p != null) {
+                            p.sendActionBar(Component.text("Game starts in " + lobbyCountdown + "s | " + players.size() + " players", NamedTextColor.YELLOW));
+                            if (lobbyCountdown <= 5) {
+                                p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 1f, 1f);
+                            }
+                        }
+                    }
+                }
+
+                lobbyCountdown--;
+            }
+        }.runTaskTimer(plugin, 0L, 20L);
+    }
+
     public void start() {
         state = GameState.STARTING;
-        theme = THEMES.get(new Random().nextInt(THEMES.size()));
+        if (lobbyTask != null && !lobbyTask.isCancelled()) {
+            lobbyTask.cancel();
+        }
 
+        theme = THEMES.get(new Random().nextInt(THEMES.size()));
         assignPlots();
 
         for (UUID uuid : players) {
@@ -128,6 +195,12 @@ public class GameSession {
         timerTask = new BukkitRunnable() {
             @Override
             public void run() {
+                if (players.isEmpty()) {
+                    cancel();
+                    forceEnd();
+                    return;
+                }
+
                 if (timeRemaining <= 0) {
                     cancel();
                     startVoting();
@@ -159,9 +232,7 @@ public class GameSession {
 
     public void end(Map<UUID, Integer> scores) {
         state = GameState.ENDING;
-        if (timerTask != null && !timerTask.isCancelled()) {
-            timerTask.cancel();
-        }
+        cancelTasks();
 
         UUID winner = null;
         int highestScore = -1;
@@ -200,6 +271,35 @@ public class GameSession {
         }, 100L);
     }
 
+    public void forceEnd() {
+        state = GameState.ENDING;
+        cancelTasks();
+
+        for (UUID uuid : new HashSet<>(players)) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                player.sendMessage(Component.text("Game ended — all players left.", NamedTextColor.RED));
+                player.teleport(arena.getLobbySpawn());
+            }
+        }
+
+        clearAllPlots();
+        players.clear();
+        playerPlotAssignments.clear();
+        teams.clear();
+        state = GameState.ENDING;
+        plugin.getArenaManager().releaseArena(arena);
+    }
+
+    private void cancelTasks() {
+        if (timerTask != null && !timerTask.isCancelled()) {
+            timerTask.cancel();
+        }
+        if (lobbyTask != null && !lobbyTask.isCancelled()) {
+            lobbyTask.cancel();
+        }
+    }
+
     private void clearAllPlots() {
         for (PlotRegion plot : arena.getPlots()) {
             plot.clear();
@@ -229,31 +329,12 @@ public class GameSession {
         return plots.get(plotIndex);
     }
 
-    public GameState getState() {
-        return state;
-    }
-
-    public GameMode getGameMode() {
-        return gameMode;
-    }
-
-    public Set<UUID> getPlayers() {
-        return players;
-    }
-
-    public Map<UUID, Integer> getPlayerPlotAssignments() {
-        return playerPlotAssignments;
-    }
-
-    public Arena getArena() {
-        return arena;
-    }
-
-    public String getTheme() {
-        return theme;
-    }
-
-    public int getTimeRemaining() {
-        return timeRemaining;
-    }
+    public GameState getState() { return state; }
+    public GameMode getGameMode() { return gameMode; }
+    public Set<UUID> getPlayers() { return players; }
+    public Map<UUID, Integer> getPlayerPlotAssignments() { return playerPlotAssignments; }
+    public Arena getArena() { return arena; }
+    public String getTheme() { return theme; }
+    public int getTimeRemaining() { return timeRemaining; }
+    public int getLobbyCountdown() { return lobbyCountdown; }
 }

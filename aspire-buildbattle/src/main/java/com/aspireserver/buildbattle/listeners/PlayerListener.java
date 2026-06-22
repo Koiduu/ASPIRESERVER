@@ -23,7 +23,11 @@ public class PlayerListener implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        plugin.getArenaManager().leaveSession(event.getPlayer().getUniqueId());
+        Player player = event.getPlayer();
+        GameSession session = plugin.getArenaManager().getPlayerSession(player.getUniqueId());
+        if (session != null) {
+            plugin.getArenaManager().leaveSession(player.getUniqueId());
+        }
     }
 
     @EventHandler

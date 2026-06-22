@@ -3,7 +3,11 @@ package com.aspireserver.buildbattle.arena;
 import com.aspireserver.buildbattle.AspireBuildBattle;
 import com.aspireserver.buildbattle.game.GameMode;
 import com.aspireserver.buildbattle.game.GameSession;
+import com.aspireserver.buildbattle.game.GameState;
 import com.aspireserver.buildbattle.plot.PlotRegion;
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -11,6 +15,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ArenaManager {
 
@@ -18,14 +23,15 @@ public class ArenaManager {
     private final Map<String, Arena> arenas;
     private final Map<UUID, GameSession> playerSessions;
     private final List<GameSession> activeSessions;
+    private Location waitingLobby;
     private File arenasFile;
     private FileConfiguration arenasConfig;
 
     public ArenaManager(AspireBuildBattle plugin) {
         this.plugin = plugin;
         this.arenas = new HashMap<>();
-        this.playerSessions = new HashMap<>();
-        this.activeSessions = new ArrayList<>();
+        this.playerSessions = new ConcurrentHashMap<>();
+        this.activeSessions = Collections.synchronizedList(new ArrayList<>());
     }
 
     public void loadArenas() {
@@ -51,8 +57,8 @@ public class ArenaManager {
                 double lx = section.getDouble(id + ".lobby.x");
                 double ly = section.getDouble(id + ".lobby.y");
                 double lz = section.getDouble(id + ".lobby.z");
-                arena.setLobbySpawn(new org.bukkit.Location(
-                    org.bukkit.Bukkit.getWorld(worldName), lx, ly, lz));
+                arena.setLobbySpawn(new Location(
+                    Bukkit.getWorld(worldName), lx, ly, lz));
             }
 
             ConfigurationSection plots = section.getConfigurationSection(id + ".plots");
@@ -70,7 +76,27 @@ public class ArenaManager {
             arenas.put(id, arena);
         }
 
+        loadWaitingLobby();
         plugin.getLogger().info("Loaded " + arenas.size() + " arena(s).");
+    }
+
+    public void loadWaitingLobby() {
+        String worldName = plugin.getConfig().getString("waiting-lobby.world");
+        if (worldName != null) {
+            World world = Bukkit.getWorld(worldName);
+            if (world != null) {
+                double x = plugin.getConfig().getDouble("waiting-lobby.x");
+                double y = plugin.getConfig().getDouble("waiting-lobby.y");
+                double z = plugin.getConfig().getDouble("waiting-lobby.z");
+                float yaw = (float) plugin.getConfig().getDouble("waiting-lobby.yaw", 0);
+                float pitch = (float) plugin.getConfig().getDouble("waiting-lobby.pitch", 0);
+                waitingLobby = new Location(world, x, y, z, yaw, pitch);
+            }
+        }
+    }
+
+    public Location getWaitingLobby() {
+        return waitingLobby;
     }
 
     public void saveArena(Arena arena) {
@@ -127,6 +153,10 @@ public class ArenaManager {
         GameSession session = playerSessions.remove(player);
         if (session != null) {
             session.removePlayer(player);
+            if (session.getPlayers().isEmpty() && session.getState() != GameState.ENDING) {
+                session.forceEnd();
+                releaseArena(session.getArena());
+            }
         }
     }
 
@@ -147,14 +177,13 @@ public class ArenaManager {
         return arenas.values();
     }
 
+    public List<GameSession> getActiveSessions() {
+        return activeSessions;
+    }
+
     public void shutdown() {
         for (GameSession session : new ArrayList<>(activeSessions)) {
-            for (UUID uuid : session.getPlayers()) {
-                org.bukkit.entity.Player player = org.bukkit.Bukkit.getPlayer(uuid);
-                if (player != null) {
-                    player.teleport(session.getArena().getLobbySpawn());
-                }
-            }
+            session.forceEnd();
         }
         activeSessions.clear();
         playerSessions.clear();

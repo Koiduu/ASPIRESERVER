@@ -11,9 +11,13 @@ import com.aspireserver.core.chat.StaffChatCommand;
 import com.aspireserver.core.commands.LobbyCommand;
 import com.aspireserver.core.friends.FriendCommand;
 import com.aspireserver.core.friends.FriendManager;
+import com.aspireserver.core.npc.NpcCommand;
+import com.aspireserver.core.npc.NpcListener;
+import com.aspireserver.core.npc.NpcManager;
 import com.aspireserver.core.party.PartyCommand;
 import com.aspireserver.core.party.PartyManager;
 import com.aspireserver.core.utils.MessageUtil;
+import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class AspireCore extends JavaPlugin {
@@ -23,6 +27,7 @@ public final class AspireCore extends JavaPlugin {
     private FriendManager friendManager;
     private AdminManager adminManager;
     private ChatManager chatManager;
+    private NpcManager npcManager;
 
     @Override
     public void onEnable() {
@@ -33,9 +38,13 @@ public final class AspireCore extends JavaPlugin {
         friendManager = new FriendManager(this);
         adminManager = new AdminManager(this);
         chatManager = new ChatManager(this);
+        npcManager = new NpcManager(this);
 
         registerCommands();
         getServer().getPluginManager().registerEvents(chatManager, this);
+        getServer().getPluginManager().registerEvents(new NpcListener(this, npcManager), this);
+
+        Bukkit.getScheduler().runTaskLater(this, () -> npcManager.spawnAllNpcs(), 20L);
 
         getLogger().info(MessageUtil.PREFIX_RAW + "AspireCore enabled!");
     }
@@ -44,6 +53,8 @@ public final class AspireCore extends JavaPlugin {
     public void onDisable() {
         friendManager.saveData();
         adminManager.saveData();
+        npcManager.despawnAll();
+        npcManager.saveNpcs();
         getLogger().info(MessageUtil.PREFIX_RAW + "AspireCore disabled.");
     }
 
@@ -70,6 +81,10 @@ public final class AspireCore extends JavaPlugin {
         getCommand("kick").setExecutor(new KickCommand(adminManager));
         getCommand("warn").setExecutor(new WarnCommand(adminManager));
         getCommand("sc").setExecutor(new StaffChatCommand(chatManager));
+
+        NpcCommand npcCommand = new NpcCommand(npcManager);
+        getCommand("npc").setExecutor(npcCommand);
+        getCommand("npc").setTabCompleter(npcCommand);
     }
 
     public static AspireCore getInstance() {
@@ -90,5 +105,9 @@ public final class AspireCore extends JavaPlugin {
 
     public ChatManager getChatManager() {
         return chatManager;
+    }
+
+    public NpcManager getNpcManager() {
+        return npcManager;
     }
 }
