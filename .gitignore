@@ -19,3 +19,4 @@ Thumbs.db
 
 # Build
 dependency-reduced-pom.xml
+build/
