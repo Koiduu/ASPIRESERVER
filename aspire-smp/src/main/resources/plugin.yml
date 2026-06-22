@@ -1,0 +1,29 @@
+name: AspireSMP
+version: '1.0.0'
+main: com.aspireserver.smp.AspireSMP
+api-version: '1.21'
+description: SMP survival plugin with claims, graveyard, and one-player sleep
+author: Aspire Team
+depend: [AspireCore]
+
+commands:
+  claim:
+    description: Claim land
+    usage: /claim <pos1|pos2|confirm|here|info|list>
+  unclaim:
+    description: Remove a claim at your location
+    usage: /unclaim
+  trust:
+    description: Trust a player on your claims
+    usage: /trust <player>
+  upgradeland:
+    description: Open land upgrade GUI
+    usage: /upgradeland
+
+permissions:
+  aspire.smp.claim:
+    description: Allows claiming land
+    default: true
+  aspire.admin.bypass:
+    description: Bypass claim protections
+    default: op

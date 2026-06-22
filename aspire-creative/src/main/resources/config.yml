@@ -1,0 +1,22 @@
+# AspireCreative Configuration
+
+# Max plots per player
+max-plots-per-player: 3
+
+# Plot sizes
+plots:
+  small:
+    size: 75
+    world: "creative_small"
+  medium:
+    size: 251
+    world: "creative_medium"
+  large:
+    size: 501
+    world: "creative_large"
+
+# WorldEdit volume limit (blocks) - operations beyond this are async
+max-worldedit-volume: 250000
+
+# Async chunk loading
+async-chunks: true
