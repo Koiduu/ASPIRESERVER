@@ -40,7 +40,6 @@ public final class AspireCreative extends JavaPlugin {
         PlotCommand plotCmd = new PlotCommand(plotManager);
         getCommand("plot").setExecutor(plotCmd);
         getCommand("plot").setTabCompleter(plotCmd);
-        getCommand("p").setExecutor(plotCmd);
     }
 
     private void registerListeners() {
