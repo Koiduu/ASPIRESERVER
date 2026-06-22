@@ -9,8 +9,11 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.*;
@@ -167,7 +170,25 @@ public class GameSession {
         }
 
         state = GameState.BUILDING;
+        giveNetherStar();
         startTimer();
+    }
+
+    private void giveNetherStar() {
+        for (UUID uuid : players) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                ItemStack star = new ItemStack(Material.NETHER_STAR);
+                ItemMeta meta = star.getItemMeta();
+                meta.displayName(Component.text("Plot Customizer", NamedTextColor.LIGHT_PURPLE));
+                meta.lore(List.of(
+                    Component.text("Right-click to change your", NamedTextColor.GRAY),
+                    Component.text("plot floor material", NamedTextColor.GRAY)
+                ));
+                star.setItemMeta(meta);
+                player.getInventory().setItem(8, star);
+            }
+        }
     }
 
     private void assignPlots() {
@@ -179,6 +200,7 @@ public class GameSession {
             Set<UUID> assigned = new HashSet<>();
             for (UUID player : players) {
                 if (assigned.contains(player)) continue;
+                if (plotIndex >= plots.size()) break;
                 UUID partner = teams.get(player);
                 playerPlotAssignments.put(player, plotIndex);
                 if (partner != null) {
@@ -187,13 +209,12 @@ public class GameSession {
                 }
                 assigned.add(player);
                 plotIndex++;
-                if (plotIndex >= plots.size()) plotIndex = 0;
             }
         } else {
             for (UUID player : players) {
+                if (plotIndex >= plots.size()) break;
                 playerPlotAssignments.put(player, plotIndex);
                 plotIndex++;
-                if (plotIndex >= plots.size()) plotIndex = 0;
             }
         }
     }
@@ -303,6 +324,14 @@ public class GameSession {
         state = GameState.ENDING;
         cancelTasks();
         removeAllScoreboards();
+
+        // Clear all player inventories
+        for (UUID uuid : players) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                player.getInventory().clear();
+            }
+        }
 
         UUID winner = null;
         int highestScore = -1;

@@ -15,6 +15,7 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.BlockRedstoneEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
 
@@ -162,6 +163,16 @@ public class AntiGriefListener implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onItemDrop(PlayerDropItemEvent event) {
+        Player player = event.getPlayer();
+        GameSession session = plugin.getArenaManager().getPlayerSession(player.getUniqueId());
+        if (session == null) return;
+        event.setCancelled(true);
+        player.sendActionBar(net.kyori.adventure.text.Component.text(
+            "You cannot drop items here!", net.kyori.adventure.text.format.NamedTextColor.RED));
+    }
+
     @EventHandler
     public void onCreatureSpawn(CreatureSpawnEvent event) {
         if (event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.CUSTOM
@@ -181,6 +192,15 @@ public class AntiGriefListener implements Listener {
                             .count();
                         if (entityCount >= MAX_ENTITIES_PER_PLOT) {
                             event.setCancelled(true);
+                            return;
+                        }
+                        // Freeze the mob
+                        if (event.getEntity() instanceof org.bukkit.entity.Mob mob) {
+                            mob.setAI(false);
+                            mob.setGravity(false);
+                            mob.setInvulnerable(true);
+                            mob.setSilent(true);
+                            mob.setCollidable(false);
                         }
                         return;
                     }

@@ -7,6 +7,8 @@ import com.aspireserver.buildbattle.commands.SpawnSetWaitingCommand;
 import com.aspireserver.buildbattle.listeners.AntiGriefListener;
 import com.aspireserver.buildbattle.listeners.PlotToolListener;
 import com.aspireserver.buildbattle.listeners.PlayerListener;
+import com.aspireserver.buildbattle.mob.MobManager;
+import com.aspireserver.buildbattle.plot.FloorManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class AspireBuildBattle extends JavaPlugin {
@@ -54,6 +56,8 @@ public final class AspireBuildBattle extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new AntiGriefListener(this), this);
         getServer().getPluginManager().registerEvents(new PlotToolListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
+        getServer().getPluginManager().registerEvents(new MobManager(this), this);
+        getServer().getPluginManager().registerEvents(new FloorManager(this), this);
     }
 
     public static AspireBuildBattle getInstance() {

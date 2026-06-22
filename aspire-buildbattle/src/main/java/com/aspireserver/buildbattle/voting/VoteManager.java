@@ -2,6 +2,7 @@ package com.aspireserver.buildbattle.voting;
 
 import com.aspireserver.buildbattle.AspireBuildBattle;
 import com.aspireserver.buildbattle.game.GameSession;
+import com.aspireserver.buildbattle.game.GameState;
 import com.aspireserver.buildbattle.plot.PlotRegion;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -25,7 +26,6 @@ public class VoteManager {
     private int currentPlotIndex;
     private final int totalPlots;
 
-    public static final String VOTE_GUI_TITLE = "Rate this Build!";
     public static final String REPORT_CONFIRM_TITLE = "Confirm Report?";
 
     public VoteManager(GameSession session, AspireBuildBattle plugin) {
@@ -55,12 +55,14 @@ public class VoteManager {
 
     private void showNextPlot() {
         if (currentPlotIndex >= totalPlots) {
+            clearVotingItems();
             calculateResults();
             return;
         }
 
         List<PlotRegion> plots = session.getArena().getPlots();
         if (currentPlotIndex >= plots.size()) {
+            clearVotingItems();
             calculateResults();
             return;
         }
@@ -75,7 +77,10 @@ public class VoteManager {
 
                 Integer playerPlot = session.getPlayerPlotAssignments().get(uuid);
                 if (playerPlot == null || playerPlot != currentPlotIndex) {
-                    openVoteGui(player);
+                    giveVotingItems(player);
+                } else {
+                    player.getInventory().clear();
+                    player.sendMessage(Component.text("This is your plot! You cannot vote on it.", NamedTextColor.GRAY));
                 }
             }
         }
@@ -89,30 +94,42 @@ public class VoteManager {
         }.runTaskLater(plugin, 15 * 20L);
     }
 
-    public void openVoteGui(Player player) {
-        Inventory gui = Bukkit.createInventory(null, 18, Component.text(VOTE_GUI_TITLE, NamedTextColor.GOLD));
+    public void giveVotingItems(Player player) {
+        player.getInventory().clear();
 
-        // Row 1: F D E C B A S (slots 1-7)
-        gui.setItem(1, createVoteItem(Material.TERRACOTTA, "F", NamedTextColor.DARK_RED, 1));
-        gui.setItem(2, createVoteItem(Material.RED_TERRACOTTA, "D", NamedTextColor.RED, 2));
-        gui.setItem(3, createVoteItem(Material.ORANGE_TERRACOTTA, "E", NamedTextColor.GOLD, 3));
-        gui.setItem(4, createVoteItem(Material.YELLOW_TERRACOTTA, "C", NamedTextColor.YELLOW, 4));
-        gui.setItem(5, createVoteItem(Material.LIME_TERRACOTTA, "B", NamedTextColor.GREEN, 5));
-        gui.setItem(6, createVoteItem(Material.GREEN_TERRACOTTA, "A", NamedTextColor.DARK_GREEN, 6));
-        gui.setItem(7, createVoteItem(Material.DIAMOND_BLOCK, "S", NamedTextColor.AQUA, 7));
-
-        // Row 2, slot 13: Report button (barrier)
+        // Slot 0: Red Terracotta = F
+        player.getInventory().setItem(0, createVoteItem(Material.RED_TERRACOTTA, "F", NamedTextColor.RED, 1));
+        // Slot 1: Pink Terracotta = D
+        player.getInventory().setItem(1, createVoteItem(Material.PINK_TERRACOTTA, "D", NamedTextColor.LIGHT_PURPLE, 2));
+        // Slot 2: Lime Terracotta = E
+        player.getInventory().setItem(2, createVoteItem(Material.LIME_TERRACOTTA, "E", NamedTextColor.GREEN, 3));
+        // Slot 3: Green Terracotta = C
+        player.getInventory().setItem(3, createVoteItem(Material.GREEN_TERRACOTTA, "C", NamedTextColor.DARK_GREEN, 4));
+        // Slot 4: Purple Terracotta = B
+        player.getInventory().setItem(4, createVoteItem(Material.PURPLE_TERRACOTTA, "B", NamedTextColor.DARK_PURPLE, 5));
+        // Slot 5: Yellow Terracotta = A
+        player.getInventory().setItem(5, createVoteItem(Material.YELLOW_TERRACOTTA, "A", NamedTextColor.YELLOW, 6));
+        // Slot 6: Gold Block = S
+        player.getInventory().setItem(6, createVoteItem(Material.GOLD_BLOCK, "S", NamedTextColor.GOLD, 7));
+        // Slot 8: Barrier = Report
         ItemStack reportItem = new ItemStack(Material.BARRIER);
         ItemMeta reportMeta = reportItem.getItemMeta();
         reportMeta.displayName(Component.text("Report Build", NamedTextColor.RED, TextDecoration.BOLD));
         reportMeta.lore(List.of(
-            Component.text("Click to report this build", NamedTextColor.GRAY),
+            Component.text("Right-click to report this build", NamedTextColor.GRAY),
             Component.text("for inappropriate content", NamedTextColor.GRAY)
         ));
         reportItem.setItemMeta(reportMeta);
-        gui.setItem(13, reportItem);
+        player.getInventory().setItem(8, reportItem);
+    }
 
-        player.openInventory(gui);
+    private void clearVotingItems() {
+        for (UUID uuid : session.getPlayers()) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                player.getInventory().clear();
+            }
+        }
     }
 
     public void openReportConfirmGui(Player player) {
@@ -145,8 +162,8 @@ public class VoteManager {
     private ItemStack createVoteItem(Material material, String grade, NamedTextColor color, int score) {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text(grade, color, TextDecoration.BOLD));
-        meta.lore(List.of(Component.text(score + " points", NamedTextColor.GRAY)));
+        meta.displayName(Component.text("Vote: " + grade, color, TextDecoration.BOLD));
+        meta.lore(List.of(Component.text("Right-click to vote " + grade, NamedTextColor.GRAY)));
         item.setItemMeta(meta);
         return item;
     }
@@ -185,6 +202,10 @@ public class VoteManager {
 
     public int getCurrentPlotIndex() {
         return currentPlotIndex;
+    }
+
+    public GameSession getSession() {
+        return session;
     }
 
     private void calculateResults() {
