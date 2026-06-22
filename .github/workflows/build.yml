@@ -1,0 +1,33 @@
+name: Build Plugins
+
+on:
+  push:
+    branches: [ init-branch ]
+  pull_request:
+    branches: [ init-branch ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Build with Maven
+        run: ./mvnw clean package -q
+
+      - name: Upload plugin JARs
+        uses: actions/upload-artifact@v4
+        with:
+          name: ASPIRESERVER-plugins
+          path: |
+            aspire-core/target/aspire-core-*.jar
+            aspire-buildbattle/target/aspire-buildbattle-*.jar
+            aspire-smp/target/aspire-smp-*.jar
+            aspire-creative/target/aspire-creative-*.jar
+            !**/original-*.jar
