@@ -1,6 +1,9 @@
 # AspireBuildBattle Configuration
 
-# Minimum players to auto-start
+# Lobby countdown before game starts (seconds)
+lobby-countdown: 60
+
+# Minimum players required to start a game
 min-players:
   solo: 2
   teams: 4
@@ -14,5 +17,5 @@ max-heads-per-plot: 15
 # Voting time per plot (seconds)
 vote-time-per-plot: 15
 
-# Countdown before game starts (seconds)
+# Countdown before building phase (seconds, after lobby countdown)
 start-countdown: 3

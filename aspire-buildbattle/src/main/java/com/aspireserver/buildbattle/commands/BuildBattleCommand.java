@@ -20,14 +20,11 @@ import java.util.*;
 public class BuildBattleCommand implements CommandExecutor, TabCompleter {
 
     private final AspireBuildBattle plugin;
-    private final Map<GameMode, Queue<UUID>> queues;
+    private final Map<GameMode, GameSession> waitingSessions;
 
     public BuildBattleCommand(AspireBuildBattle plugin) {
         this.plugin = plugin;
-        this.queues = new EnumMap<>(GameMode.class);
-        for (GameMode mode : GameMode.values()) {
-            queues.put(mode, new LinkedList<>());
-        }
+        this.waitingSessions = new EnumMap<>(GameMode.class);
     }
 
     @Override
@@ -56,7 +53,7 @@ public class BuildBattleCommand implements CommandExecutor, TabCompleter {
                 }
                 joinQueue(player, mode);
             }
-            case "leave" -> leaveQueue(player);
+            case "leave" -> leaveGame(player);
             case "start" -> {
                 if (!player.hasPermission("aspire.buildbattle.admin")) {
                     player.sendMessage(Component.text("No permission!", NamedTextColor.RED));
@@ -73,6 +70,7 @@ public class BuildBattleCommand implements CommandExecutor, TabCompleter {
                 }
                 forceStart(player, mode);
             }
+            case "status" -> showStatus(player);
             default -> sendUsage(player);
         }
         return true;
@@ -84,83 +82,80 @@ public class BuildBattleCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        for (Queue<UUID> queue : queues.values()) {
-            if (queue.contains(player.getUniqueId())) {
-                player.sendMessage(Component.text("You are already in a queue!", NamedTextColor.RED));
-                return;
-            }
+        GameSession waitingSession = waitingSessions.get(mode);
+
+        if (waitingSession != null && waitingSession.getState() == GameState.WAITING) {
+            plugin.getArenaManager().joinSession(player.getUniqueId(), waitingSession);
+            player.sendMessage(Component.text("Joined " + mode.getDisplayName() + "! (" + waitingSession.getPlayers().size() + " players waiting)", NamedTextColor.GREEN));
+            return;
         }
 
-        Queue<UUID> queue = queues.get(mode);
-        queue.add(player.getUniqueId());
-        player.sendMessage(Component.text("Joined " + mode.getDisplayName() + " queue! (" + queue.size() + " in queue)", NamedTextColor.GREEN));
-
-        int minPlayers = mode.isTeamMode() ? 4 : 2;
-        if (queue.size() >= minPlayers) {
-            startGame(mode);
+        Arena arena = plugin.getArenaManager().getAvailableArena();
+        if (arena == null) {
+            player.sendMessage(Component.text("No arenas available! Please wait.", NamedTextColor.RED));
+            return;
         }
+
+        GameSession session = plugin.getArenaManager().createSession(arena, mode);
+        waitingSessions.put(mode, session);
+        plugin.getArenaManager().joinSession(player.getUniqueId(), session);
+
+        player.sendMessage(Component.text("Joined " + mode.getDisplayName() + "! Lobby countdown started. (1 player)", NamedTextColor.GREEN));
+
+        session.startLobbyCountdown();
     }
 
-    private void leaveQueue(Player player) {
-        for (Queue<UUID> queue : queues.values()) {
-            if (queue.remove(player.getUniqueId())) {
-                player.sendMessage(Component.text("Left the queue.", NamedTextColor.YELLOW));
-                return;
-            }
-        }
-
+    private void leaveGame(Player player) {
         GameSession session = plugin.getArenaManager().getPlayerSession(player.getUniqueId());
         if (session != null) {
             plugin.getArenaManager().leaveSession(player.getUniqueId());
             player.teleport(session.getArena().getLobbySpawn());
             player.sendMessage(Component.text("Left the game.", NamedTextColor.YELLOW));
-            return;
-        }
 
-        player.sendMessage(Component.text("You are not in a queue or game!", NamedTextColor.RED));
-    }
-
-    private void startGame(GameMode mode) {
-        Arena arena = plugin.getArenaManager().getAvailableArena();
-        if (arena == null) {
-            Queue<UUID> queue = queues.get(mode);
-            for (UUID uuid : queue) {
-                Player p = Bukkit.getPlayer(uuid);
-                if (p != null) {
-                    p.sendMessage(Component.text("No arenas available! Please wait.", NamedTextColor.RED));
+            for (GameMode mode : GameMode.values()) {
+                if (waitingSessions.get(mode) == session && session.getPlayers().isEmpty()) {
+                    waitingSessions.remove(mode);
                 }
             }
             return;
         }
 
-        Queue<UUID> queue = queues.get(mode);
-        int maxPlayers = Math.min(arena.getMaxPlayers(), queue.size());
-        if (mode.isTeamMode()) {
-            maxPlayers = Math.min(maxPlayers * 2, queue.size());
-        }
-
-        GameSession session = plugin.getArenaManager().createSession(arena, mode);
-
-        for (int i = 0; i < maxPlayers; i++) {
-            UUID uuid = queue.poll();
-            if (uuid == null) break;
-            plugin.getArenaManager().joinSession(uuid, session);
-        }
-
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (session.getState() == GameState.WAITING) {
-                session.start();
-            }
-        }, 60L);
+        player.sendMessage(Component.text("You are not in a game!", NamedTextColor.RED));
     }
 
     private void forceStart(Player player, GameMode mode) {
-        Queue<UUID> queue = queues.get(mode);
-        if (queue.isEmpty()) {
-            queue.add(player.getUniqueId());
+        GameSession waitingSession = waitingSessions.get(mode);
+        if (waitingSession != null && waitingSession.getState() == GameState.WAITING) {
+            waitingSession.start();
+            waitingSessions.remove(mode);
+            player.sendMessage(Component.text("Force-started " + mode.getDisplayName() + " game.", NamedTextColor.GREEN));
+            return;
         }
-        startGame(mode);
+
+        Arena arena = plugin.getArenaManager().getAvailableArena();
+        if (arena == null) {
+            player.sendMessage(Component.text("No arenas available!", NamedTextColor.RED));
+            return;
+        }
+
+        GameSession session = plugin.getArenaManager().createSession(arena, mode);
+        plugin.getArenaManager().joinSession(player.getUniqueId(), session);
+        session.start();
         player.sendMessage(Component.text("Force-started " + mode.getDisplayName() + " game.", NamedTextColor.GREEN));
+    }
+
+    private void showStatus(Player player) {
+        List<GameSession> sessions = plugin.getArenaManager().getActiveSessions();
+        if (sessions.isEmpty()) {
+            player.sendMessage(Component.text("No active games.", NamedTextColor.GRAY));
+            return;
+        }
+        player.sendMessage(Component.text("--- Active Games ---", NamedTextColor.GOLD));
+        for (GameSession s : sessions) {
+            player.sendMessage(Component.text(
+                s.getGameMode().getDisplayName() + " [" + s.getState() + "] - " + s.getPlayers().size() + " players - Arena: " + s.getArena().getId(),
+                NamedTextColor.GRAY));
+        }
     }
 
     private GameMode parseMode(String input) {
@@ -175,15 +170,16 @@ public class BuildBattleCommand implements CommandExecutor, TabCompleter {
 
     private void sendUsage(Player player) {
         player.sendMessage(Component.text("--- Build Battle ---", NamedTextColor.GOLD));
-        player.sendMessage(Component.text("/bb join <mode> - Join a queue", NamedTextColor.GRAY));
-        player.sendMessage(Component.text("/bb leave - Leave queue/game", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/bb join <mode> - Join a game", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/bb leave - Leave current game", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/bb status - View active games", NamedTextColor.GRAY));
         player.sendMessage(Component.text("Modes: solo, teams, prosolo, proteams", NamedTextColor.GRAY));
     }
 
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         if (args.length == 1) {
-            return List.of("join", "leave", "start").stream()
+            return List.of("join", "leave", "start", "status").stream()
                 .filter(s -> s.startsWith(args[0].toLowerCase())).toList();
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("join") || args[0].equalsIgnoreCase("start"))) {
