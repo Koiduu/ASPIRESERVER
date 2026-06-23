@@ -1,6 +1,7 @@
 package com.aspireserver.buildbattle.commands;
 
 import com.aspireserver.buildbattle.AspireBuildBattle;
+import com.aspireserver.buildbattle.admin.PlotManagementGui;
 import com.aspireserver.buildbattle.arena.Arena;
 import com.aspireserver.buildbattle.game.GameMode;
 import com.aspireserver.buildbattle.game.GameSession;
@@ -21,10 +22,15 @@ public class BuildBattleCommand implements CommandExecutor, TabCompleter {
 
     private final AspireBuildBattle plugin;
     private final Map<GameMode, GameSession> waitingSessions;
+    private PlotManagementGui plotGui;
 
     public BuildBattleCommand(AspireBuildBattle plugin) {
         this.plugin = plugin;
         this.waitingSessions = new EnumMap<>(GameMode.class);
+    }
+
+    public void setPlotGui(PlotManagementGui plotGui) {
+        this.plotGui = plotGui;
     }
 
     @Override
@@ -93,6 +99,17 @@ public class BuildBattleCommand implements CommandExecutor, TabCompleter {
                 }
                 handleListPlots(player, args[1]);
             }
+            case "plots" -> {
+                if (!player.hasPermission("aspire.buildbattle.admin")) {
+                    player.sendMessage(Component.text("No permission!", NamedTextColor.RED));
+                    return true;
+                }
+                if (args.length < 2) {
+                    player.sendMessage(Component.text("Usage: /bb plots <arenaId>", NamedTextColor.RED));
+                    return true;
+                }
+                handlePlotsGui(player, args[1]);
+            }
             default -> sendUsage(player);
         }
         return true;
@@ -107,8 +124,12 @@ public class BuildBattleCommand implements CommandExecutor, TabCompleter {
         GameSession waitingSession = waitingSessions.get(mode);
 
         if (waitingSession != null && waitingSession.getState() == GameState.WAITING) {
+            if (waitingSession.getPlayers().size() >= mode.getMaxPlayers()) {
+                player.sendMessage(Component.text("Game is full! (" + mode.getMaxPlayers() + "/" + mode.getMaxPlayers() + ")", NamedTextColor.RED));
+                return;
+            }
             plugin.getArenaManager().joinSession(player.getUniqueId(), waitingSession);
-            player.sendMessage(Component.text("Joined " + mode.getDisplayName() + "! (" + waitingSession.getPlayers().size() + " players waiting)", NamedTextColor.GREEN));
+            player.sendMessage(Component.text("Joined " + mode.getDisplayName() + "! (" + waitingSession.getPlayers().size() + "/" + mode.getMaxPlayers() + " players)", NamedTextColor.GREEN));
             return;
         }
 
@@ -122,7 +143,7 @@ public class BuildBattleCommand implements CommandExecutor, TabCompleter {
         waitingSessions.put(mode, session);
         plugin.getArenaManager().joinSession(player.getUniqueId(), session);
 
-        player.sendMessage(Component.text("Joined " + mode.getDisplayName() + "! Lobby countdown started. (1 player)", NamedTextColor.GREEN));
+        player.sendMessage(Component.text("Joined " + mode.getDisplayName() + "! Lobby countdown started. (1/" + mode.getMaxPlayers() + " players)", NamedTextColor.GREEN));
 
         session.startLobbyCountdown();
     }
@@ -225,11 +246,25 @@ public class BuildBattleCommand implements CommandExecutor, TabCompleter {
         };
     }
 
+    private void handlePlotsGui(Player player, String arenaId) {
+        Arena arena = plugin.getArenaManager().getArena(arenaId);
+        if (arena == null) {
+            player.sendMessage(Component.text("Arena not found!", NamedTextColor.RED));
+            return;
+        }
+        if (plotGui != null) {
+            plotGui.openGui(player, arena);
+        } else {
+            player.sendMessage(Component.text("Plot GUI not available.", NamedTextColor.RED));
+        }
+    }
+
     private void sendUsage(Player player) {
         player.sendMessage(Component.text("--- Build Battle ---", NamedTextColor.GOLD));
         player.sendMessage(Component.text("/bb join <mode> - Join a game", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/bb leave - Leave current game", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/bb status - View active games", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/bb plots <arena> - Manage plots (GUI)", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/bb listplots <arena> - List plots", NamedTextColor.GRAY));
         player.sendMessage(Component.text("/bb removeplot <arena> <index> - Remove a plot", NamedTextColor.GRAY));
         player.sendMessage(Component.text("Modes: solo, teams, prosolo, proteams", NamedTextColor.GRAY));
@@ -238,14 +273,14 @@ public class BuildBattleCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         if (args.length == 1) {
-            return List.of("join", "leave", "start", "status", "removeplot", "listplots").stream()
+            return List.of("join", "leave", "start", "status", "plots", "removeplot", "listplots").stream()
                 .filter(s -> s.startsWith(args[0].toLowerCase())).toList();
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("join") || args[0].equalsIgnoreCase("start"))) {
             return List.of("solo", "teams", "prosolo", "proteams").stream()
                 .filter(s -> s.startsWith(args[1].toLowerCase())).toList();
         }
-        if (args.length == 2 && (args[0].equalsIgnoreCase("removeplot") || args[0].equalsIgnoreCase("listplots"))) {
+        if (args.length == 2 && (args[0].equalsIgnoreCase("removeplot") || args[0].equalsIgnoreCase("listplots") || args[0].equalsIgnoreCase("plots"))) {
             return plugin.getArenaManager().getArenas().stream()
                 .map(a -> a.getId())
                 .filter(s -> s.toLowerCase().startsWith(args[1].toLowerCase())).toList();

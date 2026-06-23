@@ -6,12 +6,16 @@ import com.aspireserver.buildbattle.plot.PlotRegion;
 import com.aspireserver.buildbattle.voting.VoteManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
+import org.bukkit.World;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -34,17 +38,26 @@ public class GameSession {
     private int lobbyCountdown;
     private BukkitTask timerTask;
     private BukkitTask lobbyTask;
+    private BukkitTask themeVoteTask;
     private VoteManager voteManager;
     private String theme;
     private final Map<UUID, Scoreboard> playerScoreboards;
+    private final Map<UUID, Material> originalFloors;
 
-    private static final List<String> THEMES = List.of(
+    // Theme voting
+    private final Map<String, Integer> themeVotes = new HashMap<>();
+    private List<String> themeOptions;
+    private int themeVoteCountdown = 10;
+
+    private static final List<String> ALL_THEMES = List.of(
         "Castle", "Underwater Temple", "Spaceship", "Medieval Village",
         "Treehouse", "Dragon's Lair", "Candy Land", "Pirate Ship",
         "Enchanted Forest", "Volcano", "Ice Palace", "Haunted House",
         "Sky Island", "Ancient Ruins", "Robot Factory", "Farm",
         "Aquarium", "Library", "Roller Coaster", "Mushroom Kingdom"
     );
+
+    public static final String THEME_VOTE_TITLE = "Vote for Theme";
 
     public GameSession(AspireBuildBattle plugin, Arena arena, GameMode gameMode) {
         this.plugin = plugin;
@@ -54,6 +67,7 @@ public class GameSession {
         this.teams = new HashMap<>();
         this.players = new LinkedHashSet<>();
         this.playerScoreboards = new HashMap<>();
+        this.originalFloors = new HashMap<>();
         this.state = GameState.WAITING;
         this.timeRemaining = gameMode.getDurationSeconds();
         this.lobbyCountdown = plugin.getConfig().getInt("lobby-countdown", 60);
@@ -109,7 +123,7 @@ public class GameSession {
                         ? plugin.getConfig().getInt("min-players." + gameMode.name().toLowerCase().replace("_", "-"), 4)
                         : plugin.getConfig().getInt("min-players." + gameMode.name().toLowerCase().replace("_", "-"), 2);
                     if (players.size() >= minPlayers) {
-                        start();
+                        startThemeVoting();
                     } else {
                         for (UUID uuid : new HashSet<>(players)) {
                             Player p = Bukkit.getPlayer(uuid);
@@ -126,7 +140,7 @@ public class GameSession {
                 for (UUID uuid : players) {
                     Player p = Bukkit.getPlayer(uuid);
                     if (p != null) {
-                        p.sendActionBar(Component.text("Game starts in " + lobbyCountdown + "s | " + players.size() + " players", NamedTextColor.YELLOW));
+                        p.sendActionBar(Component.text("Game starts in " + lobbyCountdown + "s | " + players.size() + "/" + gameMode.getMaxPlayers() + " players", NamedTextColor.YELLOW));
                         if (lobbyCountdown <= 5) {
                             p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 1f, 1f);
                         }
@@ -138,14 +152,105 @@ public class GameSession {
         }.runTaskTimer(plugin, 0L, 20L);
     }
 
-    public void start() {
+    private void startThemeVoting() {
         state = GameState.STARTING;
         if (lobbyTask != null && !lobbyTask.isCancelled()) {
             lobbyTask.cancel();
         }
 
-        theme = THEMES.get(new Random().nextInt(THEMES.size()));
+        // Pick 3 random theme options
+        List<String> shuffled = new ArrayList<>(ALL_THEMES);
+        Collections.shuffle(shuffled);
+        themeOptions = shuffled.subList(0, Math.min(3, shuffled.size()));
+        for (String t : themeOptions) {
+            themeVotes.put(t, 0);
+        }
+
+        // Give each player the theme vote GUI
+        for (UUID uuid : players) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                player.sendMessage(Component.text("Vote for this round's theme!", NamedTextColor.GOLD));
+                openThemeVoteGui(player);
+            }
+        }
+
+        // Start countdown
+        themeVoteCountdown = 10;
+        themeVoteTask = new BukkitRunnable() {
+            @Override
+            public void run() {
+                if (themeVoteCountdown <= 0) {
+                    cancel();
+                    finalizeThemeVote();
+                    return;
+                }
+                for (UUID uuid : players) {
+                    Player p = Bukkit.getPlayer(uuid);
+                    if (p != null) {
+                        p.sendActionBar(Component.text("Theme voting ends in " + themeVoteCountdown + "s", NamedTextColor.GOLD));
+                    }
+                }
+                themeVoteCountdown--;
+            }
+        }.runTaskTimer(plugin, 0L, 20L);
+    }
+
+    private void openThemeVoteGui(Player player) {
+        Inventory gui = Bukkit.createInventory(null, 9,
+            Component.text(THEME_VOTE_TITLE, NamedTextColor.GOLD));
+
+        for (int i = 0; i < themeOptions.size(); i++) {
+            String themeName = themeOptions.get(i);
+            ItemStack item = new ItemStack(getThemeIcon(i));
+            ItemMeta meta = item.getItemMeta();
+            meta.displayName(Component.text(themeName, NamedTextColor.YELLOW, TextDecoration.BOLD));
+            meta.lore(List.of(Component.text("Click to vote!", NamedTextColor.GRAY)));
+            item.setItemMeta(meta);
+            gui.setItem(2 + (i * 2), item);
+        }
+
+        player.openInventory(gui);
+    }
+
+    private Material getThemeIcon(int index) {
+        return switch (index) {
+            case 0 -> Material.DIAMOND;
+            case 1 -> Material.EMERALD;
+            case 2 -> Material.AMETHYST_SHARD;
+            default -> Material.PAPER;
+        };
+    }
+
+    public void registerThemeVote(UUID player, int slot) {
+        int themeIndex = (slot - 2) / 2;
+        if (themeIndex < 0 || themeIndex >= themeOptions.size()) return;
+        String chosen = themeOptions.get(themeIndex);
+        themeVotes.merge(chosen, 1, Integer::sum);
+        Player p = Bukkit.getPlayer(player);
+        if (p != null) {
+            p.closeInventory();
+            p.sendMessage(Component.text("Voted for: " + chosen, NamedTextColor.GREEN));
+        }
+    }
+
+    private void finalizeThemeVote() {
+        // Pick the theme with the most votes
+        String winningTheme = themeOptions.get(0);
+        int maxVotes = 0;
+        for (Map.Entry<String, Integer> entry : themeVotes.entrySet()) {
+            if (entry.getValue() > maxVotes) {
+                maxVotes = entry.getValue();
+                winningTheme = entry.getKey();
+            }
+        }
+        theme = winningTheme;
+        startGame();
+    }
+
+    private void startGame() {
         assignPlots();
+        saveOriginalFloors();
 
         for (UUID uuid : players) {
             Player player = Bukkit.getPlayer(uuid);
@@ -172,6 +277,48 @@ public class GameSession {
         state = GameState.BUILDING;
         giveNetherStar();
         startTimer();
+    }
+
+    public void start() {
+        // Called by force-start (skips theme voting)
+        state = GameState.STARTING;
+        if (lobbyTask != null && !lobbyTask.isCancelled()) {
+            lobbyTask.cancel();
+        }
+
+        theme = ALL_THEMES.get(new Random().nextInt(ALL_THEMES.size()));
+        startGame();
+    }
+
+    private void saveOriginalFloors() {
+        for (int i = 0; i < arena.getPlots().size(); i++) {
+            PlotRegion plot = arena.getPlots().get(i);
+            World world = Bukkit.getWorld(plot.getWorldName());
+            if (world == null) continue;
+            // Save the material at center of floor
+            int cx = (plot.getMinX() + plot.getMaxX()) / 2;
+            int cz = (plot.getMinZ() + plot.getMaxZ()) / 2;
+            Block block = world.getBlockAt(cx, plot.getMinY(), cz);
+            // Use plot index as fake UUID key - just store material per plot
+            originalFloors.put(new UUID(0, i), block.getType());
+        }
+    }
+
+    private void resetFloors() {
+        for (int i = 0; i < arena.getPlots().size(); i++) {
+            PlotRegion plot = arena.getPlots().get(i);
+            Material original = originalFloors.get(new UUID(0, i));
+            if (original == null) original = Material.GRASS_BLOCK;
+            World world = Bukkit.getWorld(plot.getWorldName());
+            if (world == null) continue;
+            Material floorMat = original;
+            for (int x = plot.getMinX() + 1; x < plot.getMaxX(); x++) {
+                for (int z = plot.getMinZ() + 1; z < plot.getMaxZ(); z++) {
+                    Block block = world.getBlockAt(x, plot.getMinY(), z);
+                    block.setType(floorMat, false);
+                }
+            }
+        }
     }
 
     private void giveNetherStar() {
@@ -366,6 +513,7 @@ public class GameSession {
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             clearAllPlots();
+            resetFloors();
             resetSession();
         }, 100L);
     }
@@ -384,6 +532,7 @@ public class GameSession {
         }
 
         clearAllPlots();
+        resetFloors();
         players.clear();
         playerPlotAssignments.clear();
         teams.clear();
@@ -397,6 +546,9 @@ public class GameSession {
         }
         if (lobbyTask != null && !lobbyTask.isCancelled()) {
             lobbyTask.cancel();
+        }
+        if (themeVoteTask != null && !themeVoteTask.isCancelled()) {
+            themeVoteTask.cancel();
         }
     }
 
@@ -416,6 +568,7 @@ public class GameSession {
         players.clear();
         playerPlotAssignments.clear();
         teams.clear();
+        originalFloors.clear();
         state = GameState.WAITING;
         timeRemaining = gameMode.getDurationSeconds();
         plugin.getArenaManager().releaseArena(arena);
@@ -429,6 +582,7 @@ public class GameSession {
         return plots.get(plotIndex);
     }
 
+    public List<String> getThemeOptions() { return themeOptions; }
     public GameState getState() { return state; }
     public GameMode getGameMode() { return gameMode; }
     public Set<UUID> getPlayers() { return players; }

@@ -15,6 +15,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.inventory.InventoryClickEvent;
+
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -26,19 +27,7 @@ public class FloorManager implements Listener {
 
     private final AspireBuildBattle plugin;
 
-    public static final String FLOOR_GUI_TITLE = "Change Plot Floor";
-
-    private static final Material[] FLOOR_MATERIALS = {
-        Material.GRASS_BLOCK, Material.STONE, Material.OAK_PLANKS,
-        Material.SAND, Material.SANDSTONE, Material.SNOW_BLOCK,
-        Material.QUARTZ_BLOCK, Material.DARK_OAK_PLANKS, Material.SPRUCE_PLANKS,
-        Material.BIRCH_PLANKS, Material.DEEPSLATE, Material.BLACKSTONE,
-        Material.END_STONE, Material.NETHERRACK, Material.CRIMSON_NYLIUM,
-        Material.WARPED_NYLIUM, Material.PACKED_ICE, Material.CLAY,
-        Material.TERRACOTTA, Material.WHITE_CONCRETE, Material.GRAY_CONCRETE,
-        Material.BLACK_CONCRETE, Material.MOSS_BLOCK, Material.MUD,
-        Material.PRISMARINE, Material.DARK_PRISMARINE, Material.SEA_LANTERN
-    };
+    public static final String FLOOR_GUI_TITLE = "Drop a Block → Set Floor";
 
     public FloorManager(AspireBuildBattle plugin) {
         this.plugin = plugin;
@@ -67,18 +56,21 @@ public class FloorManager implements Listener {
     }
 
     private void openFloorGui(Player player) {
-        Inventory gui = Bukkit.createInventory(null, 27,
+        Inventory gui = Bukkit.createInventory(null, 9,
             Component.text(FLOOR_GUI_TITLE, NamedTextColor.LIGHT_PURPLE));
 
-        for (int i = 0; i < FLOOR_MATERIALS.length && i < 27; i++) {
-            ItemStack item = new ItemStack(FLOOR_MATERIALS[i]);
-            ItemMeta meta = item.getItemMeta();
-            String name = formatMaterialName(FLOOR_MATERIALS[i]);
-            meta.displayName(Component.text(name, NamedTextColor.WHITE));
-            meta.lore(List.of(Component.text("Click to set as floor", NamedTextColor.GRAY)));
-            item.setItemMeta(meta);
-            gui.setItem(i, item);
-        }
+        // Slot 4: info item
+        ItemStack info = new ItemStack(Material.OAK_SIGN);
+        ItemMeta meta = info.getItemMeta();
+        meta.displayName(Component.text("Floor Customizer", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
+        meta.lore(List.of(
+            Component.text("Place any block in this GUI", NamedTextColor.GRAY),
+            Component.text("to set it as your plot floor!", NamedTextColor.GRAY),
+            Component.empty(),
+            Component.text("Drop a block into any slot", NamedTextColor.YELLOW)
+        ));
+        info.setItemMeta(meta);
+        gui.setItem(4, info);
 
         player.openInventory(gui);
     }
@@ -92,27 +84,32 @@ public class FloorManager implements Listener {
 
         if (!title.equals(FLOOR_GUI_TITLE)) return;
 
+        // Allow cursor placement (dropping block into GUI)
+        ItemStack cursor = event.getCursor();
+        if (cursor != null && cursor.getType() != Material.AIR && cursor.getType().isBlock()) {
+            event.setCancelled(true);
+
+            GameSession session = plugin.getArenaManager().getPlayerSession(player.getUniqueId());
+            if (session == null || session.getState() != GameState.BUILDING) {
+                player.closeInventory();
+                return;
+            }
+
+            PlotRegion plot = session.getPlayerPlot(player.getUniqueId());
+            if (plot == null) {
+                player.closeInventory();
+                return;
+            }
+
+            Material floorMaterial = cursor.getType();
+            setPlotFloor(plot, floorMaterial);
+            player.sendMessage(Component.text("Floor changed to " + formatMaterialName(floorMaterial) + "!", NamedTextColor.GREEN));
+            player.closeInventory();
+            return;
+        }
+
+        // Clicking the info item or empty slot with nothing on cursor - just cancel
         event.setCancelled(true);
-
-        ItemStack clicked = event.getCurrentItem();
-        if (clicked == null || clicked.getType() == Material.AIR) return;
-
-        GameSession session = plugin.getArenaManager().getPlayerSession(player.getUniqueId());
-        if (session == null || session.getState() != GameState.BUILDING) {
-            player.closeInventory();
-            return;
-        }
-
-        PlotRegion plot = session.getPlayerPlot(player.getUniqueId());
-        if (plot == null) {
-            player.closeInventory();
-            return;
-        }
-
-        Material floorMaterial = clicked.getType();
-        setPlotFloor(plot, floorMaterial);
-        player.sendMessage(Component.text("Floor changed to " + formatMaterialName(floorMaterial) + "!", NamedTextColor.GREEN));
-        player.closeInventory();
     }
 
     private void setPlotFloor(PlotRegion plot, Material material) {

@@ -1,5 +1,6 @@
 package com.aspireserver.buildbattle;
 
+import com.aspireserver.buildbattle.admin.PlotManagementGui;
 import com.aspireserver.buildbattle.arena.ArenaManager;
 import com.aspireserver.buildbattle.commands.BuildBattleCommand;
 import com.aspireserver.buildbattle.commands.PlotSetCommand;
@@ -39,7 +40,11 @@ public final class AspireBuildBattle extends JavaPlugin {
     }
 
     private void registerCommands() {
+        PlotManagementGui plotGui = new PlotManagementGui(this);
+        getServer().getPluginManager().registerEvents(plotGui, this);
+
         BuildBattleCommand bbCmd = new BuildBattleCommand(this);
+        bbCmd.setPlotGui(plotGui);
         getCommand("buildbattle").setExecutor(bbCmd);
         getCommand("buildbattle").setTabCompleter(bbCmd);
         getCommand("bb").setExecutor(bbCmd);
