@@ -12,8 +12,15 @@ commands:
   plot:
     description: Creative plot commands
     usage: /plot <claim|home|clear|dispose|add|remove|list|info>
+  creativeworld:
+    description: Set creative world for a size tier
+    usage: /creativeworld <small|medium|large> <worldName>
+    permission: aspire.admin.creative
 
 permissions:
+  aspire.admin.creative:
+    description: Creative admin commands
+    default: op
   aspire.creative.plot:
     description: Use creative plot system
     default: true

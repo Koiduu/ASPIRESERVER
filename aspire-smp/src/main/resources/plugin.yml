@@ -19,8 +19,15 @@ commands:
   upgradeland:
     description: Open land upgrade GUI
     usage: /upgradeland
+  smpworld:
+    description: Set the SMP world
+    usage: /smpworld <worldName>
+    permission: aspire.admin.smp
 
 permissions:
+  aspire.admin.smp:
+    description: SMP admin commands
+    default: op
   aspire.smp.claim:
     description: Allows claiming land
     default: true

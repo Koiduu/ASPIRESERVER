@@ -99,10 +99,10 @@ public class VoteManager {
 
         // Slot 0: Red Terracotta = F
         player.getInventory().setItem(0, createVoteItem(Material.RED_TERRACOTTA, "F", NamedTextColor.RED, 1));
-        // Slot 1: Pink Terracotta = D
-        player.getInventory().setItem(1, createVoteItem(Material.PINK_TERRACOTTA, "D", NamedTextColor.LIGHT_PURPLE, 2));
-        // Slot 2: Lime Terracotta = E
-        player.getInventory().setItem(2, createVoteItem(Material.LIME_TERRACOTTA, "E", NamedTextColor.GREEN, 3));
+        // Slot 1: Lime Terracotta = E
+        player.getInventory().setItem(1, createVoteItem(Material.LIME_TERRACOTTA, "E", NamedTextColor.GREEN, 2));
+        // Slot 2: Pink Terracotta = D
+        player.getInventory().setItem(2, createVoteItem(Material.PINK_TERRACOTTA, "D", NamedTextColor.LIGHT_PURPLE, 3));
         // Slot 3: Green Terracotta = C
         player.getInventory().setItem(3, createVoteItem(Material.GREEN_TERRACOTTA, "C", NamedTextColor.DARK_GREEN, 4));
         // Slot 4: Purple Terracotta = B

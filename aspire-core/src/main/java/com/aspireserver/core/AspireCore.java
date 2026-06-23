@@ -8,7 +8,11 @@ import com.aspireserver.core.admin.TempBanCommand;
 import com.aspireserver.core.admin.WarnCommand;
 import com.aspireserver.core.chat.ChatManager;
 import com.aspireserver.core.chat.StaffChatCommand;
+import com.aspireserver.core.commands.FlySpeedCommand;
 import com.aspireserver.core.commands.LobbyCommand;
+import com.aspireserver.core.loadout.LoadoutCommand;
+import com.aspireserver.core.loadout.LoadoutJoinListener;
+import com.aspireserver.core.loadout.LoadoutManager;
 import com.aspireserver.core.friends.FriendCommand;
 import com.aspireserver.core.friends.FriendManager;
 import com.aspireserver.core.npc.NpcCommand;
@@ -28,6 +32,7 @@ public final class AspireCore extends JavaPlugin {
     private AdminManager adminManager;
     private ChatManager chatManager;
     private NpcManager npcManager;
+    private LoadoutManager loadoutManager;
 
     @Override
     public void onEnable() {
@@ -39,10 +44,12 @@ public final class AspireCore extends JavaPlugin {
         adminManager = new AdminManager(this);
         chatManager = new ChatManager(this);
         npcManager = new NpcManager(this);
+        loadoutManager = new LoadoutManager(this);
 
         registerCommands();
         getServer().getPluginManager().registerEvents(chatManager, this);
         getServer().getPluginManager().registerEvents(new NpcListener(this, npcManager), this);
+        getServer().getPluginManager().registerEvents(new LoadoutJoinListener(loadoutManager, this), this);
 
         Bukkit.getScheduler().runTaskLater(this, () -> npcManager.spawnAllNpcs(), 20L);
 
@@ -53,6 +60,7 @@ public final class AspireCore extends JavaPlugin {
     public void onDisable() {
         friendManager.saveData();
         adminManager.saveData();
+        loadoutManager.save();
         npcManager.despawnAll();
         npcManager.saveNpcs();
         getLogger().info(MessageUtil.PREFIX_RAW + "AspireCore disabled.");
@@ -85,6 +93,14 @@ public final class AspireCore extends JavaPlugin {
         NpcCommand npcCommand = new NpcCommand(npcManager);
         getCommand("npc").setExecutor(npcCommand);
         getCommand("npc").setTabCompleter(npcCommand);
+
+        FlySpeedCommand flySpeedCmd = new FlySpeedCommand();
+        getCommand("flyspeed").setExecutor(flySpeedCmd);
+        getCommand("flyspeed").setTabCompleter(flySpeedCmd);
+
+        LoadoutCommand loadoutCmd = new LoadoutCommand(loadoutManager);
+        getCommand("loadout").setExecutor(loadoutCmd);
+        getCommand("loadout").setTabCompleter(loadoutCmd);
     }
 
     public static AspireCore getInstance() {

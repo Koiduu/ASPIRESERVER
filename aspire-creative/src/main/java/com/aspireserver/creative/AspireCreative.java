@@ -1,5 +1,6 @@
 package com.aspireserver.creative;
 
+import com.aspireserver.creative.commands.CreativeWorldCommand;
 import com.aspireserver.creative.commands.PlotCommand;
 import com.aspireserver.creative.generator.FlatPlotGenerator;
 import com.aspireserver.creative.listeners.PlotListener;
@@ -40,6 +41,10 @@ public final class AspireCreative extends JavaPlugin {
         PlotCommand plotCmd = new PlotCommand(plotManager);
         getCommand("plot").setExecutor(plotCmd);
         getCommand("plot").setTabCompleter(plotCmd);
+
+        CreativeWorldCommand cwCmd = new CreativeWorldCommand(this);
+        getCommand("creativeworld").setExecutor(cwCmd);
+        getCommand("creativeworld").setTabCompleter(cwCmd);
     }
 
     private void registerListeners() {

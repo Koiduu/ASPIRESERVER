@@ -2,8 +2,8 @@ package com.aspireserver.buildbattle.voting;
 
 public enum VoteRating {
     F(1),
-    D(2),
-    E(3),
+    E(2),
+    D(3),
     C(4),
     B(5),
     A(6),

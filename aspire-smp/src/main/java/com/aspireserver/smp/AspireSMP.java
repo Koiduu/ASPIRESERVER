@@ -3,11 +3,13 @@ package com.aspireserver.smp;
 import com.aspireserver.smp.claim.ClaimManager;
 import com.aspireserver.smp.commands.ClaimCommand;
 import com.aspireserver.smp.commands.TrustCommand;
+import com.aspireserver.smp.commands.SmpWorldCommand;
 import com.aspireserver.smp.commands.UpgradeLandCommand;
 import com.aspireserver.smp.graveyard.GraveyardManager;
 import com.aspireserver.smp.listeners.ClaimListener;
 import com.aspireserver.smp.listeners.DeathListener;
 import com.aspireserver.smp.listeners.SleepListener;
+import com.aspireserver.smp.listeners.GoldenShovelListener;
 import com.aspireserver.smp.listeners.VisualizerListener;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -46,6 +48,10 @@ public final class AspireSMP extends JavaPlugin {
 
         getCommand("trust").setExecutor(new TrustCommand(claimManager));
         getCommand("upgradeland").setExecutor(new UpgradeLandCommand(claimManager));
+
+        SmpWorldCommand smpWorldCmd = new SmpWorldCommand(this);
+        getCommand("smpworld").setExecutor(smpWorldCmd);
+        getCommand("smpworld").setTabCompleter(smpWorldCmd);
     }
 
     private void registerListeners() {
@@ -53,6 +59,7 @@ public final class AspireSMP extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new DeathListener(this), this);
         getServer().getPluginManager().registerEvents(new SleepListener(this), this);
         getServer().getPluginManager().registerEvents(new VisualizerListener(claimManager, this), this);
+        getServer().getPluginManager().registerEvents(new GoldenShovelListener(claimManager, this), this);
     }
 
     public static AspireSMP getInstance() {

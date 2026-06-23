@@ -55,6 +55,12 @@ commands:
     description: NPC management
     usage: /npc <create|edit|remove|movehere|list>
     permission: aspire.admin.npc
+  flyspeed:
+    description: Change fly speed
+    usage: /flyspeed <1-5>
+  loadout:
+    description: Save and load inventory loadouts
+    usage: /loadout <save|load|delete|list|auto> [name]
 
 permissions:
   aspire.admin.ban:

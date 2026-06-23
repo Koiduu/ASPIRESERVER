@@ -19,8 +19,12 @@ commands:
     usage: /plotset <arenaId>
     permission: aspire.buildbattle.admin
   spawnsetwaiting:
-    description: Set the waiting lobby spawn
+    description: Set the waiting lobby spawn (global)
     usage: /spawnsetwaiting
+    permission: aspire.buildbattle.admin
+  spawnwaiting:
+    description: Set mode-specific waiting lobby
+    usage: /spawnwaiting [solo|teams|pro]
     permission: aspire.buildbattle.admin
   togglesolo:
     description: Toggle plot creation to solo mode
