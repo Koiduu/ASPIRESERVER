@@ -87,6 +87,8 @@ public class PlayerListener implements Listener {
 
         if (titleText.equals(VoteManager.REPORT_CONFIRM_TITLE)) {
             handleReportConfirmClick(event, player);
+        } else if (titleText.equals(GameSession.THEME_VOTE_TITLE)) {
+            handleThemeVoteClick(event, player);
         }
     }
 
@@ -106,5 +108,17 @@ public class PlayerListener implements Listener {
         } else if (slot == 15) {
             player.closeInventory();
         }
+    }
+
+    private void handleThemeVoteClick(InventoryClickEvent event, Player player) {
+        event.setCancelled(true);
+
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || clicked.getType() == Material.AIR) return;
+
+        GameSession session = plugin.getArenaManager().getPlayerSession(player.getUniqueId());
+        if (session == null || session.getState() != GameState.STARTING) return;
+
+        session.registerThemeVote(player.getUniqueId(), event.getSlot());
     }
 }

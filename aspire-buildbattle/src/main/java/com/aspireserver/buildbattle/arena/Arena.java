@@ -15,12 +15,14 @@ public class Arena {
     private final List<PlotRegion> plots;
     private Location lobbySpawn;
     private boolean inUse;
+    private String plotType; // "solo", "teams", "pro"
 
     public Arena(String id, String worldName) {
         this.id = id;
         this.worldName = worldName;
         this.plots = new ArrayList<>();
         this.inUse = false;
+        this.plotType = "solo";
     }
 
     public void addPlot(PlotRegion plot) {
@@ -65,6 +67,14 @@ public class Arena {
 
     public void setInUse(boolean inUse) {
         this.inUse = inUse;
+    }
+
+    public String getPlotType() {
+        return plotType;
+    }
+
+    public void setPlotType(String plotType) {
+        this.plotType = plotType;
     }
 
     public int getMaxPlayers() {

@@ -52,6 +52,7 @@ public class ArenaManager {
         for (String id : section.getKeys(false)) {
             String worldName = section.getString(id + ".world", "world");
             Arena arena = new Arena(id, worldName);
+            arena.setPlotType(section.getString(id + ".plotType", "solo"));
 
             if (section.contains(id + ".lobby")) {
                 double lx = section.getDouble(id + ".lobby.x");
@@ -103,6 +104,7 @@ public class ArenaManager {
         String path = "arenas." + arena.getId();
         arenasConfig.set(path, null);
         arenasConfig.set(path + ".world", arena.getWorldName());
+        arenasConfig.set(path + ".plotType", arena.getPlotType());
 
         if (arena.getLobbySpawn() != null) {
             arenasConfig.set(path + ".lobby.x", arena.getLobbySpawn().getX());
@@ -136,6 +138,25 @@ public class ArenaManager {
             }
         }
         return null;
+    }
+
+    public Arena getAvailableArenaForMode(GameMode mode) {
+        String requiredType = getPlotTypeForMode(mode);
+        for (Arena arena : arenas.values()) {
+            if (!arena.isInUse() && !arena.getPlots().isEmpty()
+                && arena.getPlotType().equals(requiredType)) {
+                return arena;
+            }
+        }
+        return null;
+    }
+
+    private String getPlotTypeForMode(GameMode mode) {
+        return switch (mode) {
+            case SOLO -> "solo";
+            case TEAMS -> "teams";
+            case PRO_SOLO, PRO_TEAMS -> "pro";
+        };
     }
 
     public GameSession createSession(Arena arena, GameMode mode) {

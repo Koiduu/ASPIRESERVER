@@ -22,6 +22,30 @@ commands:
     description: Set the waiting lobby spawn
     usage: /spawnsetwaiting
     permission: aspire.buildbattle.admin
+  togglesolo:
+    description: Toggle plot creation to solo mode
+    usage: /togglesolo
+    permission: aspire.buildbattle.admin
+  toggleteams:
+    description: Toggle plot creation to teams mode
+    usage: /toggleteams
+    permission: aspire.buildbattle.admin
+  togglepro:
+    description: Toggle plot creation to pro mode
+    usage: /togglepro
+    permission: aspire.buildbattle.admin
+  soloplot:
+    description: Create/manage solo lobby arenas
+    usage: /soloplot <number>
+    permission: aspire.buildbattle.admin
+  teamplot:
+    description: Create/manage teams lobby arenas
+    usage: /teamplot <number>
+    permission: aspire.buildbattle.admin
+  proplot:
+    description: Create/manage pro lobby arenas
+    usage: /proplot <number>
+    permission: aspire.buildbattle.admin
 
 permissions:
   aspire.buildbattle.admin:

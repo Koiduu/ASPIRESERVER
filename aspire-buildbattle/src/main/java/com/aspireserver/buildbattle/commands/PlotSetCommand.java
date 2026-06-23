@@ -10,11 +10,14 @@ import org.bukkit.Location;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.event.HandlerList;
 import org.jetbrains.annotations.NotNull;
 
-public class PlotSetCommand implements CommandExecutor {
+import java.util.List;
+
+public class PlotSetCommand implements CommandExecutor, TabCompleter {
 
     private final AspireBuildBattle plugin;
 
@@ -35,8 +38,11 @@ public class PlotSetCommand implements CommandExecutor {
         }
 
         if (args.length < 1) {
+            String currentType = TogglePlotTypeCommand.getPlotType(player.getUniqueId());
             player.sendMessage(Component.text("Usage: /plotset <arenaId>", NamedTextColor.RED));
-            player.sendMessage(Component.text("Use a Carrot: Left-click = Pos1, Right-click = Pos2", NamedTextColor.GRAY));
+            player.sendMessage(Component.text("Current plot type: " + currentType.toUpperCase(), NamedTextColor.GRAY));
+            player.sendMessage(Component.text("Use /togglesolo, /toggleteams, /togglepro to change type", NamedTextColor.GRAY));
+            player.sendMessage(Component.text("Example: /plotset solo-1  (adds a plot to arena 'solo-1')", NamedTextColor.GRAY));
             return true;
         }
 
@@ -68,9 +74,12 @@ public class PlotSetCommand implements CommandExecutor {
             return true;
         }
 
+        String plotType = TogglePlotTypeCommand.getPlotType(player.getUniqueId());
+
         Arena arena = plugin.getArenaManager().getArena(arenaId);
         if (arena == null) {
             arena = new Arena(arenaId, pos1.getWorld().getName());
+            arena.setPlotType(plotType);
         }
 
         PlotRegion plot = new PlotRegion(
@@ -84,8 +93,18 @@ public class PlotSetCommand implements CommandExecutor {
 
         toolListener.clearPositions(player.getUniqueId());
 
-        player.sendMessage(Component.text("Plot added to arena '" + arenaId + "'! ("
+        player.sendMessage(Component.text("Plot added to arena '" + arenaId + "' [" + arena.getPlotType() + "]! ("
             + arena.getPlots().size() + " total plots)", NamedTextColor.GREEN));
         return true;
+    }
+
+    @Override
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
+        if (args.length == 1) {
+            return plugin.getArenaManager().getArenas().stream()
+                .map(a -> a.getId())
+                .filter(s -> s.toLowerCase().startsWith(args[0].toLowerCase())).toList();
+        }
+        return List.of();
     }
 }
