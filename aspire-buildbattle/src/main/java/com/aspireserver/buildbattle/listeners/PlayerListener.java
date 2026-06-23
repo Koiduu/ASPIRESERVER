@@ -2,14 +2,19 @@ package com.aspireserver.buildbattle.listeners;
 
 import com.aspireserver.buildbattle.AspireBuildBattle;
 import com.aspireserver.buildbattle.game.GameSession;
+import com.aspireserver.buildbattle.game.GameState;
+import com.aspireserver.buildbattle.voting.VoteManager;
 import com.aspireserver.buildbattle.voting.VoteRating;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 
@@ -23,7 +28,54 @@ public class PlayerListener implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        plugin.getArenaManager().leaveSession(event.getPlayer().getUniqueId());
+        Player player = event.getPlayer();
+        GameSession session = plugin.getArenaManager().getPlayerSession(player.getUniqueId());
+        if (session != null) {
+            plugin.getArenaManager().leaveSession(player.getUniqueId());
+        }
+    }
+
+    @EventHandler
+    public void onPlayerInteract(PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+
+        Player player = event.getPlayer();
+        GameSession session = plugin.getArenaManager().getPlayerSession(player.getUniqueId());
+        if (session == null || session.getState() != GameState.VOTING) return;
+
+        ItemStack item = event.getItem();
+        if (item == null || !item.hasItemMeta()) return;
+
+        Material type = item.getType();
+        int score = getScoreFromMaterial(type);
+
+        if (score > 0) {
+            event.setCancelled(true);
+            VoteManager vm = session.getVoteManager();
+            if (vm != null) {
+                vm.registerVote(player.getUniqueId(), score);
+                player.sendMessage(Component.text("Vote registered! (" + VoteRating.fromScore(score).name() + ")", NamedTextColor.GREEN));
+            }
+        } else if (type == Material.BARRIER) {
+            event.setCancelled(true);
+            VoteManager vm = session.getVoteManager();
+            if (vm != null) {
+                vm.openReportConfirmGui(player);
+            }
+        }
+    }
+
+    private int getScoreFromMaterial(Material material) {
+        return switch (material) {
+            case RED_TERRACOTTA -> VoteRating.F.getScore();
+            case PINK_TERRACOTTA -> VoteRating.D.getScore();
+            case LIME_TERRACOTTA -> VoteRating.E.getScore();
+            case GREEN_TERRACOTTA -> VoteRating.C.getScore();
+            case PURPLE_TERRACOTTA -> VoteRating.B.getScore();
+            case YELLOW_TERRACOTTA -> VoteRating.A.getScore();
+            case GOLD_BLOCK -> VoteRating.S.getScore();
+            default -> -1;
+        };
     }
 
     @EventHandler
@@ -32,30 +84,41 @@ public class PlayerListener implements Listener {
 
         Component title = event.getView().title();
         String titleText = PlainTextComponentSerializer.plainText().serialize(title);
-        if (!titleText.equals("Vote!")) return;
 
+        if (titleText.equals(VoteManager.REPORT_CONFIRM_TITLE)) {
+            handleReportConfirmClick(event, player);
+        } else if (titleText.equals(GameSession.THEME_VOTE_TITLE)) {
+            handleThemeVoteClick(event, player);
+        }
+    }
+
+    private void handleReportConfirmClick(InventoryClickEvent event, Player player) {
         event.setCancelled(true);
 
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
 
         GameSession session = plugin.getArenaManager().getPlayerSession(player.getUniqueId());
-        if (session == null) return;
+        if (session == null || session.getState() != GameState.VOTING) return;
 
         int slot = event.getSlot();
-        int score = switch (slot) {
-            case 1 -> VoteRating.SUPER_POOP.getScore();
-            case 2 -> VoteRating.POOP.getScore();
-            case 3 -> VoteRating.OKAY.getScore();
-            case 4 -> VoteRating.GOOD.getScore();
-            case 5 -> VoteRating.EPIC.getScore();
-            case 6 -> VoteRating.LEGENDARY.getScore();
-            default -> -1;
-        };
-
-        if (score > 0) {
-            player.sendMessage(Component.text("Vote registered!", NamedTextColor.GREEN));
+        if (slot == 11) {
+            session.getVoteManager().registerReport(player.getUniqueId());
+            player.closeInventory();
+        } else if (slot == 15) {
             player.closeInventory();
         }
+    }
+
+    private void handleThemeVoteClick(InventoryClickEvent event, Player player) {
+        event.setCancelled(true);
+
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || clicked.getType() == Material.AIR) return;
+
+        GameSession session = plugin.getArenaManager().getPlayerSession(player.getUniqueId());
+        if (session == null || session.getState() != GameState.STARTING) return;
+
+        session.registerThemeVote(player.getUniqueId(), event.getSlot());
     }
 }

@@ -1,6 +1,7 @@
 package com.aspireserver.buildbattle.commands;
 
 import com.aspireserver.buildbattle.AspireBuildBattle;
+import com.aspireserver.buildbattle.admin.PlotManagementGui;
 import com.aspireserver.buildbattle.arena.Arena;
 import com.aspireserver.buildbattle.game.GameMode;
 import com.aspireserver.buildbattle.game.GameSession;
@@ -20,14 +21,16 @@ import java.util.*;
 public class BuildBattleCommand implements CommandExecutor, TabCompleter {
 
     private final AspireBuildBattle plugin;
-    private final Map<GameMode, Queue<UUID>> queues;
+    private final Map<String, GameSession> waitingSessions;
+    private PlotManagementGui plotGui;
 
     public BuildBattleCommand(AspireBuildBattle plugin) {
         this.plugin = plugin;
-        this.queues = new EnumMap<>(GameMode.class);
-        for (GameMode mode : GameMode.values()) {
-            queues.put(mode, new LinkedList<>());
-        }
+        this.waitingSessions = new HashMap<>();
+    }
+
+    public void setPlotGui(PlotManagementGui plotGui) {
+        this.plotGui = plotGui;
     }
 
     @Override
@@ -46,7 +49,7 @@ public class BuildBattleCommand implements CommandExecutor, TabCompleter {
         switch (sub) {
             case "join", "queue" -> {
                 if (args.length < 2) {
-                    player.sendMessage(Component.text("Usage: /bb join <solo|teams|prosolo|proteams>", NamedTextColor.RED));
+                    player.sendMessage(Component.text("Usage: /bb join <solo|teams|prosolo|proteams> [lobby#]", NamedTextColor.RED));
                     return true;
                 }
                 GameMode mode = parseMode(args[1]);
@@ -54,16 +57,25 @@ public class BuildBattleCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage(Component.text("Invalid mode! Use: solo, teams, prosolo, proteams", NamedTextColor.RED));
                     return true;
                 }
-                joinQueue(player, mode);
+                int lobbyNum = 1;
+                if (args.length >= 3) {
+                    try {
+                        lobbyNum = Integer.parseInt(args[2]);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage(Component.text("Invalid lobby number!", NamedTextColor.RED));
+                        return true;
+                    }
+                }
+                joinQueue(player, mode, lobbyNum);
             }
-            case "leave" -> leaveQueue(player);
+            case "leave" -> leaveGame(player);
             case "start" -> {
                 if (!player.hasPermission("aspire.buildbattle.admin")) {
                     player.sendMessage(Component.text("No permission!", NamedTextColor.RED));
                     return true;
                 }
                 if (args.length < 2) {
-                    player.sendMessage(Component.text("Usage: /bb start <mode>", NamedTextColor.RED));
+                    player.sendMessage(Component.text("Usage: /bb start <mode> [lobby#]", NamedTextColor.RED));
                     return true;
                 }
                 GameMode mode = parseMode(args[1]);
@@ -71,96 +83,227 @@ public class BuildBattleCommand implements CommandExecutor, TabCompleter {
                     player.sendMessage(Component.text("Invalid mode!", NamedTextColor.RED));
                     return true;
                 }
-                forceStart(player, mode);
+                int lobbyNum = 1;
+                if (args.length >= 3) {
+                    try {
+                        lobbyNum = Integer.parseInt(args[2]);
+                    } catch (NumberFormatException e) {
+                        player.sendMessage(Component.text("Invalid lobby number!", NamedTextColor.RED));
+                        return true;
+                    }
+                }
+                forceStart(player, mode, lobbyNum);
+            }
+            case "status" -> showStatus(player);
+            case "removeplot" -> {
+                if (!player.hasPermission("aspire.buildbattle.admin")) {
+                    player.sendMessage(Component.text("No permission!", NamedTextColor.RED));
+                    return true;
+                }
+                if (args.length < 3) {
+                    player.sendMessage(Component.text("Usage: /bb removeplot <arenaId> <plotIndex>", NamedTextColor.RED));
+                    return true;
+                }
+                handleRemovePlot(player, args[1], args[2]);
+            }
+            case "listplots" -> {
+                if (!player.hasPermission("aspire.buildbattle.admin")) {
+                    player.sendMessage(Component.text("No permission!", NamedTextColor.RED));
+                    return true;
+                }
+                if (args.length < 2) {
+                    player.sendMessage(Component.text("Usage: /bb listplots <arenaId>", NamedTextColor.RED));
+                    return true;
+                }
+                handleListPlots(player, args[1]);
+            }
+            case "plots" -> {
+                if (!player.hasPermission("aspire.buildbattle.admin")) {
+                    player.sendMessage(Component.text("No permission!", NamedTextColor.RED));
+                    return true;
+                }
+                if (args.length < 2) {
+                    player.sendMessage(Component.text("Usage: /bb plots <arenaId>", NamedTextColor.RED));
+                    return true;
+                }
+                handlePlotsGui(player, args[1]);
+            }
+            case "arenas" -> {
+                if (!player.hasPermission("aspire.buildbattle.admin")) {
+                    player.sendMessage(Component.text("No permission!", NamedTextColor.RED));
+                    return true;
+                }
+                handleListArenas(player);
             }
             default -> sendUsage(player);
         }
         return true;
     }
 
-    private void joinQueue(Player player, GameMode mode) {
+    private String getArenaKey(GameMode mode, int lobbyNum) {
+        String plotType = switch (mode) {
+            case SOLO -> "solo";
+            case TEAMS -> "teams";
+            case PRO_SOLO, PRO_TEAMS -> "pro";
+        };
+        return plotType + "-" + lobbyNum;
+    }
+
+    private void joinQueue(Player player, GameMode mode, int lobbyNum) {
         if (plugin.getArenaManager().getPlayerSession(player.getUniqueId()) != null) {
             player.sendMessage(Component.text("You are already in a game!", NamedTextColor.RED));
             return;
         }
 
-        for (Queue<UUID> queue : queues.values()) {
-            if (queue.contains(player.getUniqueId())) {
-                player.sendMessage(Component.text("You are already in a queue!", NamedTextColor.RED));
+        String arenaKey = getArenaKey(mode, lobbyNum);
+        GameSession waitingSession = waitingSessions.get(arenaKey);
+
+        if (waitingSession != null && waitingSession.getState() == GameState.WAITING) {
+            if (waitingSession.getPlayers().size() >= mode.getMaxPlayers()) {
+                player.sendMessage(Component.text("Game is full! (" + mode.getMaxPlayers() + "/" + mode.getMaxPlayers() + ")", NamedTextColor.RED));
                 return;
             }
+            plugin.getArenaManager().joinSession(player.getUniqueId(), waitingSession);
+            player.sendMessage(Component.text("Joined " + mode.getDisplayName() + " Lobby #" + lobbyNum
+                + "! (" + waitingSession.getPlayers().size() + "/" + mode.getMaxPlayers() + " players)", NamedTextColor.GREEN));
+            return;
         }
 
-        Queue<UUID> queue = queues.get(mode);
-        queue.add(player.getUniqueId());
-        player.sendMessage(Component.text("Joined " + mode.getDisplayName() + " queue! (" + queue.size() + " in queue)", NamedTextColor.GREEN));
-
-        int minPlayers = mode.isTeamMode() ? 4 : 2;
-        if (queue.size() >= minPlayers) {
-            startGame(mode);
+        Arena arena = plugin.getArenaManager().getArena(arenaKey);
+        if (arena == null || arena.getPlots().isEmpty()) {
+            player.sendMessage(Component.text("No arena set up for " + arenaKey + "! Admin needs to create plots.", NamedTextColor.RED));
+            return;
         }
+        if (arena.isInUse()) {
+            player.sendMessage(Component.text("Arena " + arenaKey + " is currently in use! Try a different lobby number.", NamedTextColor.RED));
+            return;
+        }
+
+        GameSession session = plugin.getArenaManager().createSession(arena, mode);
+        waitingSessions.put(arenaKey, session);
+        plugin.getArenaManager().joinSession(player.getUniqueId(), session);
+
+        player.sendMessage(Component.text("Joined " + mode.getDisplayName() + " Lobby #" + lobbyNum
+            + "! Countdown started. (1/" + mode.getMaxPlayers() + " players)", NamedTextColor.GREEN));
+
+        session.startLobbyCountdown();
     }
 
-    private void leaveQueue(Player player) {
-        for (Queue<UUID> queue : queues.values()) {
-            if (queue.remove(player.getUniqueId())) {
-                player.sendMessage(Component.text("Left the queue.", NamedTextColor.YELLOW));
-                return;
-            }
-        }
-
+    private void leaveGame(Player player) {
         GameSession session = plugin.getArenaManager().getPlayerSession(player.getUniqueId());
         if (session != null) {
             plugin.getArenaManager().leaveSession(player.getUniqueId());
             player.teleport(session.getArena().getLobbySpawn());
             player.sendMessage(Component.text("Left the game.", NamedTextColor.YELLOW));
-            return;
-        }
 
-        player.sendMessage(Component.text("You are not in a queue or game!", NamedTextColor.RED));
-    }
-
-    private void startGame(GameMode mode) {
-        Arena arena = plugin.getArenaManager().getAvailableArena();
-        if (arena == null) {
-            Queue<UUID> queue = queues.get(mode);
-            for (UUID uuid : queue) {
-                Player p = Bukkit.getPlayer(uuid);
-                if (p != null) {
-                    p.sendMessage(Component.text("No arenas available! Please wait.", NamedTextColor.RED));
+            for (Map.Entry<String, GameSession> entry : new HashMap<>(waitingSessions).entrySet()) {
+                if (entry.getValue() == session && session.getPlayers().isEmpty()) {
+                    waitingSessions.remove(entry.getKey());
                 }
             }
             return;
         }
 
-        Queue<UUID> queue = queues.get(mode);
-        int maxPlayers = Math.min(arena.getMaxPlayers(), queue.size());
-        if (mode.isTeamMode()) {
-            maxPlayers = Math.min(maxPlayers * 2, queue.size());
+        player.sendMessage(Component.text("You are not in a game!", NamedTextColor.RED));
+    }
+
+    private void forceStart(Player player, GameMode mode, int lobbyNum) {
+        String arenaKey = getArenaKey(mode, lobbyNum);
+        GameSession waitingSession = waitingSessions.get(arenaKey);
+
+        if (waitingSession != null && waitingSession.getState() == GameState.WAITING) {
+            waitingSession.start();
+            waitingSessions.remove(arenaKey);
+            player.sendMessage(Component.text("Force-started " + mode.getDisplayName() + " Lobby #" + lobbyNum, NamedTextColor.GREEN));
+            return;
+        }
+
+        Arena arena = plugin.getArenaManager().getArena(arenaKey);
+        if (arena == null || arena.getPlots().isEmpty()) {
+            player.sendMessage(Component.text("No arena set up for " + arenaKey + "!", NamedTextColor.RED));
+            return;
         }
 
         GameSession session = plugin.getArenaManager().createSession(arena, mode);
-
-        for (int i = 0; i < maxPlayers; i++) {
-            UUID uuid = queue.poll();
-            if (uuid == null) break;
-            plugin.getArenaManager().joinSession(uuid, session);
-        }
-
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (session.getState() == GameState.WAITING) {
-                session.start();
-            }
-        }, 60L);
+        plugin.getArenaManager().joinSession(player.getUniqueId(), session);
+        session.start();
+        player.sendMessage(Component.text("Force-started " + mode.getDisplayName() + " Lobby #" + lobbyNum, NamedTextColor.GREEN));
     }
 
-    private void forceStart(Player player, GameMode mode) {
-        Queue<UUID> queue = queues.get(mode);
-        if (queue.isEmpty()) {
-            queue.add(player.getUniqueId());
+    private void showStatus(Player player) {
+        List<GameSession> sessions = plugin.getArenaManager().getActiveSessions();
+        if (sessions.isEmpty()) {
+            player.sendMessage(Component.text("No active games.", NamedTextColor.GRAY));
+            return;
         }
-        startGame(mode);
-        player.sendMessage(Component.text("Force-started " + mode.getDisplayName() + " game.", NamedTextColor.GREEN));
+        player.sendMessage(Component.text("--- Active Games ---", NamedTextColor.GOLD));
+        for (GameSession s : sessions) {
+            player.sendMessage(Component.text(
+                s.getGameMode().getDisplayName() + " [" + s.getState() + "] - "
+                + s.getPlayers().size() + " players - Arena: " + s.getArena().getId(),
+                NamedTextColor.GRAY));
+        }
+    }
+
+    private void handleRemovePlot(Player player, String arenaId, String indexStr) {
+        Arena arena = plugin.getArenaManager().getArena(arenaId);
+        if (arena == null) {
+            player.sendMessage(Component.text("Arena not found!", NamedTextColor.RED));
+            return;
+        }
+        int index;
+        try {
+            index = Integer.parseInt(indexStr);
+        } catch (NumberFormatException e) {
+            player.sendMessage(Component.text("Invalid plot index!", NamedTextColor.RED));
+            return;
+        }
+        if (arena.removePlot(index)) {
+            plugin.getArenaManager().saveArena(arena);
+            player.sendMessage(Component.text("Plot " + index + " removed from arena '" + arenaId + "'. (" + arena.getPlots().size() + " remaining)", NamedTextColor.GREEN));
+        } else {
+            player.sendMessage(Component.text("Invalid plot index! Arena has " + arena.getPlots().size() + " plots (0-" + (arena.getPlots().size() - 1) + ")", NamedTextColor.RED));
+        }
+    }
+
+    private void handleListPlots(Player player, String arenaId) {
+        Arena arena = plugin.getArenaManager().getArena(arenaId);
+        if (arena == null) {
+            player.sendMessage(Component.text("Arena not found!", NamedTextColor.RED));
+            return;
+        }
+        player.sendMessage(Component.text("--- Plots for '" + arenaId + "' [" + arena.getPlotType() + "] (" + arena.getPlots().size() + ") ---", NamedTextColor.GOLD));
+        for (int i = 0; i < arena.getPlots().size(); i++) {
+            var plot = arena.getPlots().get(i);
+            player.sendMessage(Component.text("  [" + i + "] " + plot.getMinX() + "," + plot.getMinY() + "," + plot.getMinZ()
+                + " -> " + plot.getMaxX() + "," + plot.getMaxY() + "," + plot.getMaxZ(), NamedTextColor.GRAY));
+        }
+    }
+
+    private void handlePlotsGui(Player player, String arenaId) {
+        Arena arena = plugin.getArenaManager().getArena(arenaId);
+        if (arena == null) {
+            player.sendMessage(Component.text("Arena not found!", NamedTextColor.RED));
+            return;
+        }
+        if (plotGui != null) {
+            plotGui.openGui(player, arena);
+        } else {
+            player.sendMessage(Component.text("Plot GUI not available.", NamedTextColor.RED));
+        }
+    }
+
+    private void handleListArenas(Player player) {
+        Collection<Arena> arenas = plugin.getArenaManager().getArenas();
+        if (arenas.isEmpty()) {
+            player.sendMessage(Component.text("No arenas configured.", NamedTextColor.GRAY));
+            return;
+        }
+        player.sendMessage(Component.text("--- All Arenas ---", NamedTextColor.GOLD));
+        for (Arena arena : arenas) {
+            player.sendMessage(Component.text("  " + arena.getId() + " [" + arena.getPlotType() + "] - "
+                + arena.getPlots().size() + " plots" + (arena.isInUse() ? " (IN USE)" : ""), NamedTextColor.GRAY));
+        }
     }
 
     private GameMode parseMode(String input) {
@@ -175,20 +318,34 @@ public class BuildBattleCommand implements CommandExecutor, TabCompleter {
 
     private void sendUsage(Player player) {
         player.sendMessage(Component.text("--- Build Battle ---", NamedTextColor.GOLD));
-        player.sendMessage(Component.text("/bb join <mode> - Join a queue", NamedTextColor.GRAY));
-        player.sendMessage(Component.text("/bb leave - Leave queue/game", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/bb join <mode> [lobby#] - Join a game", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/bb leave - Leave current game", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/bb status - View active games", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/bb arenas - List all arenas", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/bb plots <arena> - Manage plots (GUI)", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/bb listplots <arena> - List plots", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("/bb removeplot <arena> <index> - Remove a plot", NamedTextColor.GRAY));
         player.sendMessage(Component.text("Modes: solo, teams, prosolo, proteams", NamedTextColor.GRAY));
     }
 
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         if (args.length == 1) {
-            return List.of("join", "leave", "start").stream()
+            return List.of("join", "leave", "start", "status", "arenas", "plots", "removeplot", "listplots").stream()
                 .filter(s -> s.startsWith(args[0].toLowerCase())).toList();
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("join") || args[0].equalsIgnoreCase("start"))) {
             return List.of("solo", "teams", "prosolo", "proteams").stream()
                 .filter(s -> s.startsWith(args[1].toLowerCase())).toList();
+        }
+        if (args.length == 3 && (args[0].equalsIgnoreCase("join") || args[0].equalsIgnoreCase("start"))) {
+            return List.of("1", "2", "3", "4", "5").stream()
+                .filter(s -> s.startsWith(args[2])).toList();
+        }
+        if (args.length == 2 && (args[0].equalsIgnoreCase("removeplot") || args[0].equalsIgnoreCase("listplots") || args[0].equalsIgnoreCase("plots"))) {
+            return plugin.getArenaManager().getArenas().stream()
+                .map(Arena::getId)
+                .filter(s -> s.toLowerCase().startsWith(args[1].toLowerCase())).toList();
         }
         return List.of();
     }

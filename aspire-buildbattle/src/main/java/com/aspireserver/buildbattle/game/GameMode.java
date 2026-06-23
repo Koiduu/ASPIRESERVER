@@ -1,21 +1,23 @@
 package com.aspireserver.buildbattle.game;
 
 public enum GameMode {
-    SOLO(5 * 60, 24, 1, false),
-    TEAMS(7 * 60, 32, 2, false),
-    PRO_SOLO(10 * 60, 32, 1, true),
-    PRO_TEAMS(10 * 60, 32, 2, true);
+    SOLO(5 * 60, 24, 1, false, 16),
+    TEAMS(7 * 60, 32, 2, false, 32),
+    PRO_SOLO(10 * 60, 32, 1, true, 16),
+    PRO_TEAMS(10 * 60, 32, 2, true, 32);
 
     private final int durationSeconds;
     private final int plotSize;
     private final int teamSize;
     private final boolean worldEditEnabled;
+    private final int maxPlayers;
 
-    GameMode(int durationSeconds, int plotSize, int teamSize, boolean worldEditEnabled) {
+    GameMode(int durationSeconds, int plotSize, int teamSize, boolean worldEditEnabled, int maxPlayers) {
         this.durationSeconds = durationSeconds;
         this.plotSize = plotSize;
         this.teamSize = teamSize;
         this.worldEditEnabled = worldEditEnabled;
+        this.maxPlayers = maxPlayers;
     }
 
     public int getDurationSeconds() {
@@ -36,6 +38,10 @@ public enum GameMode {
 
     public boolean isTeamMode() {
         return teamSize > 1;
+    }
+
+    public int getMaxPlayers() {
+        return maxPlayers;
     }
 
     public String getDisplayName() {

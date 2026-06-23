@@ -1,11 +1,17 @@
 package com.aspireserver.buildbattle;
 
+import com.aspireserver.buildbattle.admin.PlotManagementGui;
 import com.aspireserver.buildbattle.arena.ArenaManager;
 import com.aspireserver.buildbattle.commands.BuildBattleCommand;
+import com.aspireserver.buildbattle.commands.LobbyPlotCommand;
 import com.aspireserver.buildbattle.commands.PlotSetCommand;
+import com.aspireserver.buildbattle.commands.SpawnSetWaitingCommand;
+import com.aspireserver.buildbattle.commands.TogglePlotTypeCommand;
 import com.aspireserver.buildbattle.listeners.AntiGriefListener;
 import com.aspireserver.buildbattle.listeners.PlotToolListener;
 import com.aspireserver.buildbattle.listeners.PlayerListener;
+import com.aspireserver.buildbattle.mob.MobManager;
+import com.aspireserver.buildbattle.plot.FloorManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class AspireBuildBattle extends JavaPlugin {
@@ -36,7 +42,11 @@ public final class AspireBuildBattle extends JavaPlugin {
     }
 
     private void registerCommands() {
+        PlotManagementGui plotGui = new PlotManagementGui(this);
+        getServer().getPluginManager().registerEvents(plotGui, this);
+
         BuildBattleCommand bbCmd = new BuildBattleCommand(this);
+        bbCmd.setPlotGui(plotGui);
         getCommand("buildbattle").setExecutor(bbCmd);
         getCommand("buildbattle").setTabCompleter(bbCmd);
         getCommand("bb").setExecutor(bbCmd);
@@ -44,12 +54,31 @@ public final class AspireBuildBattle extends JavaPlugin {
 
         PlotSetCommand plotSetCmd = new PlotSetCommand(this);
         getCommand("plotset").setExecutor(plotSetCmd);
+        getCommand("plotset").setTabCompleter(plotSetCmd);
+
+        SpawnSetWaitingCommand waitingCmd = new SpawnSetWaitingCommand(this);
+        getCommand("spawnsetwaiting").setExecutor(waitingCmd);
+
+        TogglePlotTypeCommand toggleCmd = new TogglePlotTypeCommand(this);
+        getCommand("togglesolo").setExecutor(toggleCmd);
+        getCommand("toggleteams").setExecutor(toggleCmd);
+        getCommand("togglepro").setExecutor(toggleCmd);
+
+        LobbyPlotCommand lobbyPlotCmd = new LobbyPlotCommand(this);
+        getCommand("soloplot").setExecutor(lobbyPlotCmd);
+        getCommand("soloplot").setTabCompleter(lobbyPlotCmd);
+        getCommand("teamplot").setExecutor(lobbyPlotCmd);
+        getCommand("teamplot").setTabCompleter(lobbyPlotCmd);
+        getCommand("proplot").setExecutor(lobbyPlotCmd);
+        getCommand("proplot").setTabCompleter(lobbyPlotCmd);
     }
 
     private void registerListeners() {
         getServer().getPluginManager().registerEvents(new AntiGriefListener(this), this);
         getServer().getPluginManager().registerEvents(new PlotToolListener(this), this);
         getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
+        getServer().getPluginManager().registerEvents(new MobManager(this), this);
+        getServer().getPluginManager().registerEvents(new FloorManager(this), this);
     }
 
     public static AspireBuildBattle getInstance() {
