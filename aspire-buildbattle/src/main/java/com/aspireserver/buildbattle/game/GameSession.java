@@ -42,7 +42,7 @@ public class GameSession {
     private VoteManager voteManager;
     private String theme;
     private final Map<UUID, Scoreboard> playerScoreboards;
-    private final Map<UUID, Material> originalFloors;
+    private final Map<Integer, Material> originalFloors;
 
     // Theme voting
     private final Map<String, Integer> themeVotes = new HashMap<>();
@@ -54,7 +54,11 @@ public class GameSession {
         "Treehouse", "Dragon's Lair", "Candy Land", "Pirate Ship",
         "Enchanted Forest", "Volcano", "Ice Palace", "Haunted House",
         "Sky Island", "Ancient Ruins", "Robot Factory", "Farm",
-        "Aquarium", "Library", "Roller Coaster", "Mushroom Kingdom"
+        "Aquarium", "Library", "Roller Coaster", "Mushroom Kingdom",
+        "Garden", "Beach", "Mountain", "Desert", "Forest",
+        "Lake", "City", "Park", "Cemetery", "Temple",
+        "Bridge", "Windmill", "Lighthouse", "Cottage", "Tower",
+        "Ship", "Train", "Campfire", "Waterfall", "Cave"
     );
 
     public static final String THEME_VOTE_TITLE = "Vote for Theme";
@@ -158,7 +162,6 @@ public class GameSession {
             lobbyTask.cancel();
         }
 
-        // Pick 3 random theme options
         List<String> shuffled = new ArrayList<>(ALL_THEMES);
         Collections.shuffle(shuffled);
         themeOptions = shuffled.subList(0, Math.min(3, shuffled.size()));
@@ -166,7 +169,6 @@ public class GameSession {
             themeVotes.put(t, 0);
         }
 
-        // Give each player the theme vote GUI
         for (UUID uuid : players) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
@@ -175,7 +177,6 @@ public class GameSession {
             }
         }
 
-        // Start countdown
         themeVoteCountdown = 10;
         themeVoteTask = new BukkitRunnable() {
             @Override
@@ -235,7 +236,6 @@ public class GameSession {
     }
 
     private void finalizeThemeVote() {
-        // Pick the theme with the most votes
         String winningTheme = themeOptions.get(0);
         int maxVotes = 0;
         for (Map.Entry<String, Integer> entry : themeVotes.entrySet()) {
@@ -252,15 +252,29 @@ public class GameSession {
         assignPlots();
         saveOriginalFloors();
 
+        plugin.getLogger().info("[BB] Starting game in arena " + arena.getId()
+            + " with " + players.size() + " players, " + playerPlotAssignments.size() + " assignments");
+
         for (UUID uuid : players) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
                 Integer plotIndex = playerPlotAssignments.get(uuid);
-                if (plotIndex == null) continue;
+                if (plotIndex == null) {
+                    plugin.getLogger().warning("[BB] Player " + player.getName() + " has no plot assignment!");
+                    continue;
+                }
+                if (plotIndex >= arena.getPlots().size()) {
+                    plugin.getLogger().warning("[BB] Player " + player.getName() + " assigned to invalid plot " + plotIndex);
+                    continue;
+                }
                 PlotRegion plot = arena.getPlots().get(plotIndex);
                 Location spawnLoc = plot.getSafeCenter();
                 if (spawnLoc != null) {
                     player.teleport(spawnLoc);
+                    plugin.getLogger().info("[BB] Teleported " + player.getName() + " to plot " + plotIndex
+                        + " at " + spawnLoc.getBlockX() + "," + spawnLoc.getBlockY() + "," + spawnLoc.getBlockZ());
+                } else {
+                    plugin.getLogger().warning("[BB] No safe center for plot " + plotIndex + " — player " + player.getName());
                 }
                 player.sendMessage(Component.text("Theme: ", NamedTextColor.GOLD)
                     .append(Component.text(theme, NamedTextColor.YELLOW)));
@@ -280,7 +294,6 @@ public class GameSession {
     }
 
     public void start() {
-        // Called by force-start (skips theme voting)
         state = GameState.STARTING;
         if (lobbyTask != null && !lobbyTask.isCancelled()) {
             lobbyTask.cancel();
@@ -295,20 +308,17 @@ public class GameSession {
             PlotRegion plot = arena.getPlots().get(i);
             World world = Bukkit.getWorld(plot.getWorldName());
             if (world == null) continue;
-            // Save the material at center of floor
             int cx = (plot.getMinX() + plot.getMaxX()) / 2;
             int cz = (plot.getMinZ() + plot.getMaxZ()) / 2;
             Block block = world.getBlockAt(cx, plot.getMinY(), cz);
-            // Use plot index as fake UUID key - just store material per plot
-            originalFloors.put(new UUID(0, i), block.getType());
+            originalFloors.put(i, block.getType());
         }
     }
 
     private void resetFloors() {
         for (int i = 0; i < arena.getPlots().size(); i++) {
             PlotRegion plot = arena.getPlots().get(i);
-            Material original = originalFloors.get(new UUID(0, i));
-            if (original == null) original = Material.GRASS_BLOCK;
+            Material original = originalFloors.getOrDefault(i, Material.GRASS_BLOCK);
             World world = Bukkit.getWorld(plot.getWorldName());
             if (world == null) continue;
             Material floorMat = original;
@@ -340,30 +350,43 @@ public class GameSession {
 
     private void assignPlots() {
         List<PlotRegion> plots = arena.getPlots();
-        if (plots.isEmpty()) return;
+        if (plots.isEmpty()) {
+            plugin.getLogger().warning("[BB] Arena " + arena.getId() + " has no plots!");
+            return;
+        }
+
         int plotIndex = 0;
 
         if (gameMode.isTeamMode()) {
             Set<UUID> assigned = new HashSet<>();
             for (UUID player : players) {
                 if (assigned.contains(player)) continue;
-                if (plotIndex >= plots.size()) break;
+                if (plotIndex >= plots.size()) {
+                    plugin.getLogger().warning("[BB] Ran out of plots at index " + plotIndex + " (have " + plots.size() + ")");
+                    break;
+                }
                 UUID partner = teams.get(player);
                 playerPlotAssignments.put(player, plotIndex);
-                if (partner != null) {
+                assigned.add(player);
+                if (partner != null && players.contains(partner)) {
                     playerPlotAssignments.put(partner, plotIndex);
                     assigned.add(partner);
                 }
-                assigned.add(player);
                 plotIndex++;
             }
         } else {
             for (UUID player : players) {
-                if (plotIndex >= plots.size()) break;
+                if (plotIndex >= plots.size()) {
+                    plugin.getLogger().warning("[BB] Ran out of plots at index " + plotIndex + " (have " + plots.size() + ")");
+                    break;
+                }
                 playerPlotAssignments.put(player, plotIndex);
+                plugin.getLogger().info("[BB] Assigned player to plot " + plotIndex);
                 plotIndex++;
             }
         }
+
+        plugin.getLogger().info("[BB] Assigned " + playerPlotAssignments.size() + " players to " + plotIndex + " plots");
     }
 
     private void setupScoreboard(Player player) {
@@ -374,11 +397,11 @@ public class GameSession {
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
 
         obj.getScore("").setScore(6);
-        obj.getScore("§eTheme:").setScore(5);
-        obj.getScore("§f" + theme).setScore(4);
+        obj.getScore("\u00a7eTheme:").setScore(5);
+        obj.getScore("\u00a7f" + theme).setScore(4);
         obj.getScore(" ").setScore(3);
-        obj.getScore("§eTime Left:").setScore(2);
-        obj.getScore("§f" + formatTime(timeRemaining)).setScore(1);
+        obj.getScore("\u00a7eTime Left:").setScore(2);
+        obj.getScore("\u00a7f" + formatTime(timeRemaining)).setScore(1);
 
         player.setScoreboard(board);
         playerScoreboards.put(player.getUniqueId(), board);
@@ -398,11 +421,11 @@ public class GameSession {
             if (obj == null) continue;
 
             obj.getScore("").setScore(6);
-            obj.getScore("§eTheme:").setScore(5);
-            obj.getScore("§f" + theme).setScore(4);
+            obj.getScore("\u00a7eTheme:").setScore(5);
+            obj.getScore("\u00a7f" + theme).setScore(4);
             obj.getScore(" ").setScore(3);
-            obj.getScore("§eTime Left:").setScore(2);
-            obj.getScore("§f" + formatTime(timeRemaining)).setScore(1);
+            obj.getScore("\u00a7eTime Left:").setScore(2);
+            obj.getScore("\u00a7f" + formatTime(timeRemaining)).setScore(1);
         }
     }
 
@@ -472,7 +495,6 @@ public class GameSession {
         cancelTasks();
         removeAllScoreboards();
 
-        // Clear all player inventories
         for (UUID uuid : players) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {

@@ -12,22 +12,25 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
-
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.List;
+import java.util.Map;
 
 public class FloorManager implements Listener {
 
     private final AspireBuildBattle plugin;
 
-    public static final String FLOOR_GUI_TITLE = "Drop a Block → Set Floor";
+    public static final String FLOOR_GUI_TITLE = "Drop a Block \u2192 Set Floor";
 
     public FloorManager(AspireBuildBattle plugin) {
         this.plugin = plugin;
@@ -59,15 +62,15 @@ public class FloorManager implements Listener {
         Inventory gui = Bukkit.createInventory(null, 9,
             Component.text(FLOOR_GUI_TITLE, NamedTextColor.LIGHT_PURPLE));
 
-        // Slot 4: info item
         ItemStack info = new ItemStack(Material.OAK_SIGN);
         ItemMeta meta = info.getItemMeta();
         meta.displayName(Component.text("Floor Customizer", NamedTextColor.LIGHT_PURPLE, TextDecoration.BOLD));
         meta.lore(List.of(
-            Component.text("Place any block in this GUI", NamedTextColor.GRAY),
-            Component.text("to set it as your plot floor!", NamedTextColor.GRAY),
+            Component.text("Click any block from your", NamedTextColor.GRAY),
+            Component.text("inventory to set as floor!", NamedTextColor.GRAY),
             Component.empty(),
-            Component.text("Drop a block into any slot", NamedTextColor.YELLOW)
+            Component.text("Click a block in your hotbar/inv", NamedTextColor.YELLOW),
+            Component.text("while this GUI is open.", NamedTextColor.YELLOW)
         ));
         info.setItemMeta(meta);
         gui.setItem(4, info);
@@ -75,7 +78,7 @@ public class FloorManager implements Listener {
         player.openInventory(gui);
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGH)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
 
@@ -84,32 +87,71 @@ public class FloorManager implements Listener {
 
         if (!title.equals(FLOOR_GUI_TITLE)) return;
 
-        // Allow cursor placement (dropping block into GUI)
-        ItemStack cursor = event.getCursor();
-        if (cursor != null && cursor.getType() != Material.AIR && cursor.getType().isBlock()) {
+        // If clicking in the top inventory (the GUI slots), cancel always
+        if (event.getRawSlot() < event.getView().getTopInventory().getSize()) {
+            // Check if player has a block on cursor and clicked into the GUI
+            ItemStack cursor = event.getCursor();
+            if (cursor != null && !cursor.getType().isAir() && cursor.getType().isBlock()) {
+                event.setCancelled(true);
+                applyFloor(player, cursor.getType());
+                return;
+            }
             event.setCancelled(true);
+            return;
+        }
 
-            GameSession session = plugin.getArenaManager().getPlayerSession(player.getUniqueId());
-            if (session == null || session.getState() != GameState.BUILDING) {
-                player.closeInventory();
-                return;
+        // Player clicked in their own inventory (bottom) while GUI is open
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked != null && !clicked.getType().isAir() && clicked.getType().isBlock()) {
+            event.setCancelled(true);
+            applyFloor(player, clicked.getType());
+            return;
+        }
+
+        event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+
+        String title = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+            .plainText().serialize(event.getView().title());
+
+        if (!title.equals(FLOOR_GUI_TITLE)) return;
+
+        event.setCancelled(true);
+
+        // Check if the dragged item is a block
+        ItemStack dragged = event.getOldCursor();
+        if (dragged != null && !dragged.getType().isAir() && dragged.getType().isBlock()) {
+            // Check if any of the drag slots are in the top inventory
+            int topSize = event.getView().getTopInventory().getSize();
+            for (int slot : event.getRawSlots()) {
+                if (slot < topSize) {
+                    applyFloor(player, dragged.getType());
+                    return;
+                }
             }
+        }
+    }
 
-            PlotRegion plot = session.getPlayerPlot(player.getUniqueId());
-            if (plot == null) {
-                player.closeInventory();
-                return;
-            }
-
-            Material floorMaterial = cursor.getType();
-            setPlotFloor(plot, floorMaterial);
-            player.sendMessage(Component.text("Floor changed to " + formatMaterialName(floorMaterial) + "!", NamedTextColor.GREEN));
+    private void applyFloor(Player player, Material floorMaterial) {
+        GameSession session = plugin.getArenaManager().getPlayerSession(player.getUniqueId());
+        if (session == null || session.getState() != GameState.BUILDING) {
             player.closeInventory();
             return;
         }
 
-        // Clicking the info item or empty slot with nothing on cursor - just cancel
-        event.setCancelled(true);
+        PlotRegion plot = session.getPlayerPlot(player.getUniqueId());
+        if (plot == null) {
+            player.closeInventory();
+            return;
+        }
+
+        setPlotFloor(plot, floorMaterial);
+        player.sendMessage(Component.text("Floor changed to " + formatMaterialName(floorMaterial) + "!", NamedTextColor.GREEN));
+        player.closeInventory();
     }
 
     private void setPlotFloor(PlotRegion plot, Material material) {
