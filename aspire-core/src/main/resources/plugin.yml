@@ -27,6 +27,10 @@ commands:
   l:
     description: Lobby alias
     usage: /l
+  setlobby:
+    description: Set the lobby spawn to your current location
+    usage: /setlobby
+    permission: aspire.admin.setlobby
   ban:
     description: Ban a player
     usage: /ban <player> <reason>
@@ -86,4 +90,7 @@ permissions:
     default: op
   aspire.admin.npc:
     description: NPC management
+    default: op
+  aspire.admin.setlobby:
+    description: Set lobby spawn location
     default: op

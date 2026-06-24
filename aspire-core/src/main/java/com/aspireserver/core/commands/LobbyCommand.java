@@ -35,7 +35,8 @@ public class LobbyCommand implements CommandExecutor {
 
         World world = Bukkit.getWorld(worldName);
         if (world == null) {
-            MessageUtil.sendError(player, "Lobby world not found!");
+            // Fallback: use Multiverse /mvtp command
+            player.performCommand("mvtp " + worldName);
             return true;
         }
 

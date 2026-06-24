@@ -10,6 +10,7 @@ import com.aspireserver.core.chat.ChatManager;
 import com.aspireserver.core.chat.StaffChatCommand;
 import com.aspireserver.core.commands.FlySpeedCommand;
 import com.aspireserver.core.commands.LobbyCommand;
+import com.aspireserver.core.commands.SetLobbyCommand;
 import com.aspireserver.core.listeners.WorldProtectionListener;
 import com.aspireserver.core.loadout.LoadoutCommand;
 import com.aspireserver.core.loadout.LoadoutJoinListener;
@@ -84,6 +85,7 @@ public final class AspireCore extends JavaPlugin {
 
         getCommand("lobby").setExecutor(new LobbyCommand(this));
         getCommand("l").setExecutor(new LobbyCommand(this));
+        getCommand("setlobby").setExecutor(new SetLobbyCommand(this));
 
         getCommand("ban").setExecutor(new BanCommand(adminManager));
         getCommand("tempban").setExecutor(new TempBanCommand(adminManager));
