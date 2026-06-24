@@ -1,15 +1,16 @@
 package com.aspireserver.core.listeners;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
-import org.bukkit.entity.EntityType;
-import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockExplodeEvent;
+import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -27,7 +28,17 @@ public class WorldProtectionListener implements Listener {
 
     private boolean isSmpWorld(World world) {
         String smpWorld = plugin.getConfig().getString("smp-world", "");
-        return !smpWorld.isEmpty() && world.getName().equalsIgnoreCase(smpWorld);
+        if (!smpWorld.isEmpty() && world.getName().equalsIgnoreCase(smpWorld)) {
+            return true;
+        }
+        var smpPlugin = Bukkit.getPluginManager().getPlugin("AspireSMP");
+        if (smpPlugin != null && smpPlugin.isEnabled()) {
+            String smpWorldName = smpPlugin.getConfig().getString("smp-world", "");
+            if (!smpWorldName.isEmpty() && world.getName().equalsIgnoreCase(smpWorldName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Set<String> getProtectedWorlds() {
@@ -41,6 +52,8 @@ public class WorldProtectionListener implements Listener {
         }
         return !isSmpWorld(world);
     }
+
+    // --- TNT Protection ---
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onTntPlace(BlockPlaceEvent event) {
@@ -68,7 +81,10 @@ public class WorldProtectionListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGH)
+    // --- Dragon Egg Protection ---
+    // Use LOWEST priority to fire FIRST, no bypass check (egg never teleports in protected worlds)
+
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onDragonEggInteract(PlayerInteractEvent event) {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK
                 && event.getAction() != Action.LEFT_CLICK_BLOCK
@@ -77,16 +93,16 @@ public class WorldProtectionListener implements Listener {
         if (block == null || block.getType() != Material.DRAGON_EGG) return;
 
         if (isProtectedWorld(block.getWorld())) {
-            if (!event.getPlayer().hasPermission("aspire.admin.bypass")) {
-                event.setCancelled(true);
-                event.getPlayer().sendActionBar(net.kyori.adventure.text.Component.text(
-                    "Dragon eggs cannot be used here!", net.kyori.adventure.text.format.NamedTextColor.RED));
-            }
+            event.setCancelled(true);
+            event.setUseInteractedBlock(Event.Result.DENY);
+            event.setUseItemInHand(Event.Result.DENY);
+            event.getPlayer().sendActionBar(net.kyori.adventure.text.Component.text(
+                "Dragon eggs cannot be used here!", net.kyori.adventure.text.format.NamedTextColor.RED));
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGH)
-    public void onDragonEggTeleport(org.bukkit.event.block.BlockFromToEvent event) {
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onDragonEggTeleport(BlockFromToEvent event) {
         if (event.getBlock().getType() != Material.DRAGON_EGG) return;
         if (isProtectedWorld(event.getBlock().getWorld())) {
             event.setCancelled(true);

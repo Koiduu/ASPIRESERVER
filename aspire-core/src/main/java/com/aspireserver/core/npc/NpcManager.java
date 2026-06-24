@@ -58,6 +58,8 @@ public class NpcManager {
             float pitch = (float) section.getDouble(id + ".pitch", 0);
             String skinName = section.getString(id + ".skin", null);
 
+            String customCommand = section.getString(id + ".customCommand", null);
+
             NpcAction action;
             try {
                 action = NpcAction.valueOf(actionStr);
@@ -71,6 +73,7 @@ public class NpcManager {
             Location loc = new Location(world, x, y, z, yaw, pitch);
             NpcData npc = new NpcData(id, displayName, action, loc);
             npc.setSkinName(skinName);
+            npc.setCustomCommand(customCommand);
             npcs.put(id, npc);
         }
     }
@@ -200,6 +203,9 @@ public class NpcManager {
             npcConfig.set(path + ".pitch", npc.getLocation().getPitch());
             if (npc.getSkinName() != null) {
                 npcConfig.set(path + ".skin", npc.getSkinName());
+            }
+            if (npc.getCustomCommand() != null) {
+                npcConfig.set(path + ".customCommand", npc.getCustomCommand());
             }
         }
         try {

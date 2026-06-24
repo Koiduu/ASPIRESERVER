@@ -75,19 +75,17 @@ public class NpcListener implements Listener {
             }
             case WARP_SMP -> {
                 String worldName = getSmpWorldName();
-                double x = plugin.getConfig().getDouble("warps.smp.x", 0);
-                double y = plugin.getConfig().getDouble("warps.smp.y", 100);
-                double z = plugin.getConfig().getDouble("warps.smp.z", 0);
                 World world = Bukkit.getWorld(worldName);
                 if (world != null) {
-                    Location loc = new Location(world, x, y, z);
-                    if (x == 0 && z == 0) {
-                        loc = world.getSpawnLocation();
-                    }
+                    double x = plugin.getConfig().getDouble("warps.smp.x", 0);
+                    double y = plugin.getConfig().getDouble("warps.smp.y", 100);
+                    double z = plugin.getConfig().getDouble("warps.smp.z", 0);
+                    Location loc = (x == 0 && z == 0) ? world.getSpawnLocation() : new Location(world, x, y, z);
                     player.teleport(loc);
                     MessageUtil.sendSuccess(player, "Warped to SMP!");
                 } else {
-                    MessageUtil.sendError(player, "SMP world '" + worldName + "' not found! Make sure the world is loaded.");
+                    // Fallback: try Multiverse /mvtp command
+                    player.performCommand("mvtp " + worldName);
                 }
             }
             case WARP_CREATIVE -> {
@@ -105,6 +103,14 @@ public class NpcListener implements Listener {
             }
             case WARP_LOBBY -> {
                 player.performCommand("lobby");
+            }
+            case CUSTOM_COMMAND -> {
+                String cmd = npc.getCustomCommand();
+                if (cmd != null && !cmd.isEmpty()) {
+                    player.performCommand(cmd);
+                } else {
+                    MessageUtil.sendError(player, "No custom command set! Use /npc setcmd <id> <command>");
+                }
             }
         }
     }
