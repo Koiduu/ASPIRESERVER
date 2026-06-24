@@ -10,6 +10,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 
 public final class AspireCreative extends JavaPlugin {
 
@@ -26,7 +27,14 @@ public final class AspireCreative extends JavaPlugin {
 
         registerCommands();
         registerListeners();
-        initPlotWorlds();
+
+        // Delay world initialization until server is fully loaded
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                initPlotWorlds();
+            }
+        }.runTaskLater(this, 40L);
 
         getLogger().info("[AspireCreative] Plugin enabled!");
     }
