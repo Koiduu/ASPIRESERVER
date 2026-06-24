@@ -74,16 +74,20 @@ public class NpcListener implements Listener {
                 }
             }
             case WARP_SMP -> {
-                String worldName = plugin.getConfig().getString("warps.smp.world", "world");
+                String worldName = getSmpWorldName();
                 double x = plugin.getConfig().getDouble("warps.smp.x", 0);
                 double y = plugin.getConfig().getDouble("warps.smp.y", 100);
                 double z = plugin.getConfig().getDouble("warps.smp.z", 0);
                 World world = Bukkit.getWorld(worldName);
                 if (world != null) {
-                    player.teleport(new Location(world, x, y, z));
+                    Location loc = new Location(world, x, y, z);
+                    if (x == 0 && z == 0) {
+                        loc = world.getSpawnLocation();
+                    }
+                    player.teleport(loc);
                     MessageUtil.sendSuccess(player, "Warped to SMP!");
                 } else {
-                    MessageUtil.sendError(player, "SMP world not found!");
+                    MessageUtil.sendError(player, "SMP world '" + worldName + "' not found! Make sure the world is loaded.");
                 }
             }
             case WARP_CREATIVE -> {
@@ -103,6 +107,19 @@ public class NpcListener implements Listener {
                 player.performCommand("lobby");
             }
         }
+    }
+
+    private String getSmpWorldName() {
+        // First try reading from aspire-smp plugin's config
+        var smpPlugin = Bukkit.getPluginManager().getPlugin("AspireSMP");
+        if (smpPlugin != null && smpPlugin.isEnabled()) {
+            String smpWorld = smpPlugin.getConfig().getString("smp-world", "");
+            if (!smpWorld.isEmpty()) {
+                return smpWorld;
+            }
+        }
+        // Fallback to core config
+        return plugin.getConfig().getString("warps.smp.world", "world");
     }
 
     @EventHandler

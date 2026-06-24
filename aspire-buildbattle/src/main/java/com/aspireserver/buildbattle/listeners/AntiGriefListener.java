@@ -16,7 +16,9 @@ import org.bukkit.event.block.BlockPhysicsEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.BlockRedstoneEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.EntitySpawnEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
@@ -237,6 +239,34 @@ public class AntiGriefListener implements Listener {
         event.setCancelled(true);
         player.sendActionBar(net.kyori.adventure.text.Component.text(
             "You cannot drop items here!", net.kyori.adventure.text.format.NamedTextColor.RED));
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onEntitySpawn(EntitySpawnEvent event) {
+        if (!(event.getEntity() instanceof FallingBlock)) return;
+        Location loc = event.getLocation();
+        for (var arena : plugin.getArenaManager().getArenas()) {
+            for (PlotRegion plot : arena.getPlots()) {
+                if (plot.contains(loc)) {
+                    event.setCancelled(true);
+                    return;
+                }
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onEntityChangeBlock(EntityChangeBlockEvent event) {
+        if (!(event.getEntity() instanceof FallingBlock)) return;
+        Location loc = event.getBlock().getLocation();
+        for (var arena : plugin.getArenaManager().getArenas()) {
+            for (PlotRegion plot : arena.getPlots()) {
+                if (plot.contains(loc)) {
+                    event.setCancelled(true);
+                    return;
+                }
+            }
+        }
     }
 
     @EventHandler

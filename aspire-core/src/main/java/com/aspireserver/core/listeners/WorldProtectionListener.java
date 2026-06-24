@@ -70,7 +70,9 @@ public class WorldProtectionListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onDragonEggInteract(PlayerInteractEvent event) {
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        if (event.getAction() != Action.RIGHT_CLICK_BLOCK
+                && event.getAction() != Action.LEFT_CLICK_BLOCK
+                && event.getAction() != Action.PHYSICAL) return;
         Block block = event.getClickedBlock();
         if (block == null || block.getType() != Material.DRAGON_EGG) return;
 
@@ -80,6 +82,14 @@ public class WorldProtectionListener implements Listener {
                 event.getPlayer().sendActionBar(net.kyori.adventure.text.Component.text(
                     "Dragon eggs cannot be used here!", net.kyori.adventure.text.format.NamedTextColor.RED));
             }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onDragonEggTeleport(org.bukkit.event.block.BlockFromToEvent event) {
+        if (event.getBlock().getType() != Material.DRAGON_EGG) return;
+        if (isProtectedWorld(event.getBlock().getWorld())) {
+            event.setCancelled(true);
         }
     }
 }
