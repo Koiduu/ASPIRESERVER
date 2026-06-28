@@ -6,6 +6,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Entity;
@@ -69,11 +70,13 @@ public class NpcListener implements Listener {
         NpcAction action = npc.getAction();
         switch (action) {
             case BUILD_BATTLE_SOLO, BUILD_BATTLE_TEAMS, BUILD_BATTLE_PRO_SOLO, BUILD_BATTLE_PRO_TEAMS -> {
+                player.setGameMode(GameMode.CREATIVE);
                 if (action.getCommand() != null) {
                     player.performCommand(action.getCommand());
                 }
             }
             case WARP_SMP -> {
+                player.setGameMode(GameMode.SURVIVAL);
                 String worldName = getSmpWorldName();
                 World world = Bukkit.getWorld(worldName);
                 if (world != null) {
@@ -84,11 +87,11 @@ public class NpcListener implements Listener {
                     player.teleport(loc);
                     MessageUtil.sendSuccess(player, "Warped to SMP!");
                 } else {
-                    // Fallback: try Multiverse /mvtp command
                     player.performCommand("mvtp " + worldName);
                 }
             }
             case WARP_CREATIVE -> {
+                player.setGameMode(GameMode.CREATIVE);
                 String worldName = plugin.getConfig().getString("warps.creative.world", "creative_small");
                 double x = plugin.getConfig().getDouble("warps.creative.x", 0);
                 double y = plugin.getConfig().getDouble("warps.creative.y", 65);
@@ -98,7 +101,7 @@ public class NpcListener implements Listener {
                     player.teleport(new Location(world, x, y, z));
                     MessageUtil.sendSuccess(player, "Warped to Creative!");
                 } else {
-                    MessageUtil.sendError(player, "Creative world not found!");
+                    player.performCommand("mvtp " + worldName);
                 }
             }
             case WARP_LOBBY -> {

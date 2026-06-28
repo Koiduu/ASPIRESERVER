@@ -7,8 +7,11 @@ import com.aspireserver.smp.commands.SmpWorldCommand;
 import com.aspireserver.smp.commands.UpgradeLandCommand;
 import com.aspireserver.smp.graveyard.GraveyardManager;
 import com.aspireserver.smp.listeners.ClaimListener;
+import com.aspireserver.smp.listeners.CombatLogListener;
 import com.aspireserver.smp.listeners.DeathListener;
+import com.aspireserver.smp.listeners.MobCapListener;
 import com.aspireserver.smp.listeners.SleepListener;
+import com.aspireserver.smp.listeners.SmpJoinListener;
 import com.aspireserver.smp.listeners.GoldenShovelListener;
 import com.aspireserver.smp.listeners.VisualizerListener;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -56,8 +59,11 @@ public final class AspireSMP extends JavaPlugin {
 
     private void registerListeners() {
         getServer().getPluginManager().registerEvents(new ClaimListener(claimManager), this);
+        getServer().getPluginManager().registerEvents(new CombatLogListener(this), this);
         getServer().getPluginManager().registerEvents(new DeathListener(this), this);
+        getServer().getPluginManager().registerEvents(new MobCapListener(this), this);
         getServer().getPluginManager().registerEvents(new SleepListener(this), this);
+        getServer().getPluginManager().registerEvents(new SmpJoinListener(this), this);
         getServer().getPluginManager().registerEvents(new VisualizerListener(claimManager, this), this);
         getServer().getPluginManager().registerEvents(new GoldenShovelListener(claimManager, this), this);
     }

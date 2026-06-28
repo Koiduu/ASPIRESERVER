@@ -589,8 +589,24 @@ public class GameSession {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             clearAllPlots();
             resetFloors();
+            warpToWaitingLobby();
             resetSession();
         }, 100L);
+    }
+
+    private void warpToWaitingLobby() {
+        String plotType = arena.getPlotType();
+        Location waitingLobby = plugin.getArenaManager().getWaitingLobby(plotType);
+        for (UUID uuid : players) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                if (waitingLobby != null) {
+                    player.teleport(waitingLobby);
+                } else {
+                    player.teleport(arena.getLobbySpawn());
+                }
+            }
+        }
     }
 
     public void forceEnd() {
@@ -634,12 +650,6 @@ public class GameSession {
     }
 
     private void resetSession() {
-        for (UUID uuid : players) {
-            Player player = Bukkit.getPlayer(uuid);
-            if (player != null) {
-                player.teleport(arena.getLobbySpawn());
-            }
-        }
         players.clear();
         playerPlotAssignments.clear();
         teams.clear();

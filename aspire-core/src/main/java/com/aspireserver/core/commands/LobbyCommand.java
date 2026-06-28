@@ -3,6 +3,7 @@ package com.aspireserver.core.commands;
 import com.aspireserver.core.AspireCore;
 import com.aspireserver.core.utils.MessageUtil;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.command.Command;
@@ -33,9 +34,10 @@ public class LobbyCommand implements CommandExecutor {
         float yaw = (float) plugin.getConfig().getDouble("lobby.yaw", 0);
         float pitch = (float) plugin.getConfig().getDouble("lobby.pitch", 0);
 
+        player.setGameMode(GameMode.ADVENTURE);
+
         World world = Bukkit.getWorld(worldName);
         if (world == null) {
-            // Fallback: use Multiverse /mvtp command
             player.performCommand("mvtp " + worldName);
             return true;
         }
