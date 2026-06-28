@@ -92,10 +92,20 @@ public class SmpJoinListener implements Listener {
         player.setViewDistance(NORMAL_CHUNK_VIEW);
     }
 
+    private final Map<UUID, Long> lastGlideCheck = new ConcurrentHashMap<>();
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
+        if (event.getFrom().getBlockX() == event.getTo().getBlockX()
+                && event.getFrom().getBlockZ() == event.getTo().getBlockZ()) return;
+
         Player player = event.getPlayer();
         if (!isSmpWorld(player.getWorld())) return;
+
+        UUID uuid = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        if (now - lastGlideCheck.getOrDefault(uuid, 0L) < 2000) return;
+        lastGlideCheck.put(uuid, now);
 
         if (player.isGliding()) {
             if (player.getViewDistance() != NORMAL_CHUNK_VIEW) {

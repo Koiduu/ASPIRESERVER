@@ -13,11 +13,17 @@ public class Graveyard {
     private final UUID owner;
     private final Location location;
     private final List<ItemStack> items;
+    private final long createdAt;
 
     public Graveyard(UUID owner, Location location, List<ItemStack> items) {
+        this(owner, location, items, System.currentTimeMillis());
+    }
+
+    public Graveyard(UUID owner, Location location, List<ItemStack> items, long createdAt) {
         this.owner = owner;
         this.location = location;
         this.items = items;
+        this.createdAt = createdAt;
     }
 
     public UUID getOwner() {
@@ -30,6 +36,14 @@ public class Graveyard {
 
     public List<ItemStack> getItems() {
         return items;
+    }
+
+    public long getCreatedAt() {
+        return createdAt;
+    }
+
+    public boolean isExpired(long maxAgeMillis) {
+        return System.currentTimeMillis() - createdAt > maxAgeMillis;
     }
 
     public boolean canAccess(UUID accessor) {

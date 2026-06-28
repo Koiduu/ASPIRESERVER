@@ -14,11 +14,17 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 
+import java.util.Map;
+import java.util.UUID;
+
 public class MobCapListener implements Listener {
 
     private final AspireSMP plugin;
     private static final int MOB_CAP_PER_PLAYER = 5;
     private static final int CHUNK_RADIUS = 3;
+    private final Map<UUID, Integer> cachedCounts = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<UUID, Long> cacheTimestamps = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long CACHE_DURATION_MS = 2000;
 
     public MobCapListener(AspireSMP plugin) {
         this.plugin = plugin;
@@ -45,10 +51,22 @@ public class MobCapListener implements Listener {
         Player nearest = getNearestPlayer(entity);
         if (nearest == null) return;
 
-        int mobCount = countMobsAroundPlayer(nearest);
+        int mobCount = getCachedMobCount(nearest);
         if (mobCount >= MOB_CAP_PER_PLAYER) {
             event.setCancelled(true);
         }
+    }
+
+    private int getCachedMobCount(Player player) {
+        UUID uuid = player.getUniqueId();
+        Long ts = cacheTimestamps.get(uuid);
+        if (ts != null && System.currentTimeMillis() - ts < CACHE_DURATION_MS) {
+            return cachedCounts.getOrDefault(uuid, 0);
+        }
+        int count = countMobsAroundPlayer(player);
+        cachedCounts.put(uuid, count);
+        cacheTimestamps.put(uuid, System.currentTimeMillis());
+        return count;
     }
 
     private Player getNearestPlayer(Entity entity) {

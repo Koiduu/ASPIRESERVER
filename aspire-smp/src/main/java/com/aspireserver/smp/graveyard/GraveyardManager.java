@@ -12,6 +12,8 @@ import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.EntityType;
 import org.bukkit.inventory.ItemStack;
 
+import org.bukkit.scheduler.BukkitRunnable;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
@@ -23,11 +25,51 @@ public class GraveyardManager {
     private FileConfiguration data;
     private final Map<UUID, List<Graveyard>> graveyards;
 
+    private static final long EXPIRY_MILLIS = 2L * 24 * 60 * 60 * 1000; // 2 days
+
     public GraveyardManager(AspireSMP plugin) {
         this.plugin = plugin;
         this.dataFile = new File(plugin.getDataFolder(), "graveyards.yml");
         this.graveyards = new HashMap<>();
         loadData();
+        startExpiryTask();
+    }
+
+    private void startExpiryTask() {
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                purgeExpired();
+            }
+        }.runTaskTimer(plugin, 6000L, 6000L); // every 5 minutes
+    }
+
+    public void purgeExpired() {
+        boolean changed = false;
+        for (Map.Entry<UUID, List<Graveyard>> entry : graveyards.entrySet()) {
+            Iterator<Graveyard> it = entry.getValue().iterator();
+            while (it.hasNext()) {
+                Graveyard gy = it.next();
+                if (gy.isExpired(EXPIRY_MILLIS)) {
+                    cleanupTombstone(gy);
+                    it.remove();
+                    changed = true;
+                }
+            }
+        }
+        graveyards.values().removeIf(List::isEmpty);
+        if (changed) saveAll();
+    }
+
+    private void cleanupTombstone(Graveyard gy) {
+        Location loc = gy.getLocation();
+        Block block = loc.getBlock();
+        if (block.getType() == Material.SOUL_LANTERN) {
+            block.setType(Material.AIR);
+        }
+        loc.getWorld().getEntities().stream()
+            .filter(e -> e instanceof ArmorStand && e.getLocation().distanceSquared(loc.clone().add(0.5, 1.2, 0.5)) < 1)
+            .forEach(org.bukkit.entity.Entity::remove);
     }
 
     private void loadData() {
@@ -57,6 +99,7 @@ public class GraveyardManager {
                         World w = Bukkit.getWorld(world);
                         if (w == null) continue;
 
+                        long createdAt = section.getLong(gKey + ".createdAt", System.currentTimeMillis());
                         Location loc = new Location(w, x, y, z);
                         List<ItemStack> items = new ArrayList<>();
                         var itemSection = section.getConfigurationSection(gKey + ".items");
@@ -67,7 +110,7 @@ public class GraveyardManager {
                             }
                         }
 
-                        Graveyard gy = new Graveyard(owner, loc, items);
+                        Graveyard gy = new Graveyard(owner, loc, items, createdAt);
                         list.add(gy);
                     }
                 }
@@ -87,6 +130,7 @@ public class GraveyardManager {
                 data.set(path + ".x", gy.getLocation().getX());
                 data.set(path + ".y", gy.getLocation().getY());
                 data.set(path + ".z", gy.getLocation().getZ());
+                data.set(path + ".createdAt", gy.getCreatedAt());
                 int j = 0;
                 for (ItemStack item : gy.getItems()) {
                     data.set(path + ".items." + j, item);
@@ -165,17 +209,7 @@ public class GraveyardManager {
         if (list != null) {
             list.remove(graveyard);
         }
-
-        Location loc = graveyard.getLocation();
-        Block block = loc.getBlock();
-        if (block.getType() == Material.SOUL_LANTERN) {
-            block.setType(Material.AIR);
-        }
-
-        loc.getWorld().getEntities().stream()
-            .filter(e -> e instanceof ArmorStand && e.getLocation().distanceSquared(loc.clone().add(0.5, 1.2, 0.5)) < 1)
-            .forEach(org.bukkit.entity.Entity::remove);
-
+        cleanupTombstone(graveyard);
         saveAll();
     }
 

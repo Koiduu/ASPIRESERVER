@@ -23,6 +23,9 @@ commands:
     description: Set the SMP world
     usage: /smpworld <worldName>
     permission: aspire.admin.smp
+  trade:
+    description: Trade items safely with another player
+    usage: /trade <player|accept|deny>
 
 permissions:
   aspire.admin.smp:
