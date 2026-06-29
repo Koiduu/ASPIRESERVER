@@ -16,6 +16,9 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import org.bukkit.GameMode;
+import org.bukkit.inventory.ItemStack;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Set;
@@ -90,9 +93,11 @@ public class SmpJoinListener implements Listener {
     public void onWorldChange(PlayerChangedWorldEvent event) {
         Player player = event.getPlayer();
         if (isSmpWorld(player.getWorld())) {
-            if (!hasJoinedSmBefore(player.getUniqueId())) {
+            player.setGameMode(GameMode.SURVIVAL);
+            if (!hasJoinedSmBefore(player.getUniqueId()) && isInventoryEmpty(player)) {
                 handleFirstJoin(player);
             } else {
+                markFirstJoin(player.getUniqueId());
                 applyImmunity(player);
             }
             applySlowChunks(player);
@@ -106,14 +111,23 @@ public class SmpJoinListener implements Listener {
         Player player = event.getPlayer();
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (player.isOnline() && isSmpWorld(player.getWorld())) {
-                if (!hasJoinedSmBefore(player.getUniqueId())) {
+                player.setGameMode(GameMode.SURVIVAL);
+                if (!hasJoinedSmBefore(player.getUniqueId()) && isInventoryEmpty(player)) {
                     handleFirstJoin(player);
                 } else {
+                    markFirstJoin(player.getUniqueId());
                     applyImmunity(player);
                 }
                 applySlowChunks(player);
             }
         }, 5L);
+    }
+
+    private boolean isInventoryEmpty(Player player) {
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item != null && !item.getType().isAir()) return false;
+        }
+        return true;
     }
 
     private void handleFirstJoin(Player player) {
