@@ -3,6 +3,7 @@ package com.aspireserver.creative;
 import com.aspireserver.creative.commands.CreativeWorldCommand;
 import com.aspireserver.creative.commands.PlotCommand;
 import com.aspireserver.creative.generator.FlatPlotGenerator;
+import com.aspireserver.creative.listeners.CreativeRestrictionsListener;
 import com.aspireserver.creative.listeners.PlotListener;
 import com.aspireserver.creative.listeners.WorldEditLimiter;
 import com.aspireserver.creative.plot.PlotManager;
@@ -58,6 +59,7 @@ public final class AspireCreative extends JavaPlugin {
     private void registerListeners() {
         getServer().getPluginManager().registerEvents(new PlotListener(plotManager), this);
         getServer().getPluginManager().registerEvents(new WorldEditLimiter(plotManager, this), this);
+        getServer().getPluginManager().registerEvents(new CreativeRestrictionsListener(), this);
     }
 
     private void initPlotWorlds() {
