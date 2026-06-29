@@ -19,6 +19,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.EquipmentSlot;
@@ -58,10 +59,141 @@ public class ProToolManager implements Listener {
             Component.text("Pro Build Tool", NamedTextColor.GRAY),
             Component.text("Left-click: Set pos 1", NamedTextColor.AQUA),
             Component.text("Right-click: Set pos 2", NamedTextColor.AQUA),
-            Component.text("Shift+Right: Open tool menu", NamedTextColor.YELLOW)
+            Component.text("Shift+Right: Open tool menu", NamedTextColor.YELLOW),
+            Component.text("", NamedTextColor.GRAY),
+            Component.text("Commands: //set, //replace,", NamedTextColor.GRAY),
+            Component.text("//walls, //hollow, //line,", NamedTextColor.GRAY),
+            Component.text("//layer, //clear, //undo", NamedTextColor.GRAY)
         ));
         item.setItemMeta(meta);
         return item;
+    }
+
+    // Command-based pro tools (//set, //replace, etc.)
+    @EventHandler(priority = EventPriority.LOW)
+    public void onCommand(PlayerCommandPreprocessEvent event) {
+        Player player = event.getPlayer();
+        String msg = event.getMessage().toLowerCase();
+
+        if (!msg.startsWith("//")) return;
+
+        GameSession session = plugin.getArenaManager().getPlayerSession(player.getUniqueId());
+        if (session == null || session.getState() != GameState.BUILDING) return;
+        if (!session.getGameMode().isWorldEditEnabled()) return;
+
+        event.setCancelled(true);
+        String[] parts = event.getMessage().substring(2).split(" ");
+        String cmd = parts[0].toLowerCase();
+
+        switch (cmd) {
+            case "set" -> {
+                if (parts.length < 2) {
+                    player.sendMessage(Component.text("Usage: //set <block>", NamedTextColor.RED));
+                    player.sendMessage(Component.text("Hold a block to use it, or type the name.", NamedTextColor.GRAY));
+                    return;
+                }
+                Material mat = parseMaterial(parts[1], player);
+                if (mat == null) return;
+                executeTool(player, ProToolMode.FILL, mat);
+            }
+            case "replace" -> {
+                if (parts.length < 3) {
+                    player.sendMessage(Component.text("Usage: //replace <from> <to>", NamedTextColor.RED));
+                    return;
+                }
+                Material from = parseMaterial(parts[1], player);
+                Material to = parseMaterial(parts[2], player);
+                if (from == null || to == null) return;
+                selectedMaterial.put(player.getUniqueId(), from);
+                executeTool(player, ProToolMode.REPLACE, to);
+            }
+            case "walls" -> {
+                if (parts.length < 2) {
+                    player.sendMessage(Component.text("Usage: //walls <block>", NamedTextColor.RED));
+                    return;
+                }
+                Material mat = parseMaterial(parts[1], player);
+                if (mat == null) return;
+                executeTool(player, ProToolMode.WALLS, mat);
+            }
+            case "hollow" -> {
+                if (parts.length < 2) {
+                    player.sendMessage(Component.text("Usage: //hollow <block>", NamedTextColor.RED));
+                    return;
+                }
+                Material mat = parseMaterial(parts[1], player);
+                if (mat == null) return;
+                executeTool(player, ProToolMode.HOLLOW, mat);
+            }
+            case "line" -> {
+                if (parts.length < 2) {
+                    player.sendMessage(Component.text("Usage: //line <block>", NamedTextColor.RED));
+                    return;
+                }
+                Material mat = parseMaterial(parts[1], player);
+                if (mat == null) return;
+                executeTool(player, ProToolMode.LINE, mat);
+            }
+            case "layer" -> {
+                if (parts.length < 2) {
+                    player.sendMessage(Component.text("Usage: //layer <block>", NamedTextColor.RED));
+                    return;
+                }
+                Material mat = parseMaterial(parts[1], player);
+                if (mat == null) return;
+                executeTool(player, ProToolMode.LAYER, mat);
+            }
+            case "clear" -> executeTool(player, ProToolMode.FILL, Material.AIR);
+            case "undo" -> player.sendMessage(Component.text("Undo is not available yet.", NamedTextColor.YELLOW));
+            case "pos1" -> {
+                Block target = player.getTargetBlockExact(5);
+                if (target == null) {
+                    player.sendMessage(Component.text("Look at a block!", NamedTextColor.RED));
+                    return;
+                }
+                PlotRegion plot = session.getPlayerPlot(player.getUniqueId());
+                if (plot == null || !plot.contains(target.getLocation())) {
+                    player.sendMessage(Component.text("Position must be inside your plot!", NamedTextColor.RED));
+                    return;
+                }
+                pos1Map.put(player.getUniqueId(), target.getLocation());
+                player.sendMessage(Component.text("Pos 1 set: (" + target.getX() + ", " + target.getY() + ", " + target.getZ() + ")", NamedTextColor.AQUA));
+            }
+            case "pos2" -> {
+                Block target = player.getTargetBlockExact(5);
+                if (target == null) {
+                    player.sendMessage(Component.text("Look at a block!", NamedTextColor.RED));
+                    return;
+                }
+                PlotRegion plot = session.getPlayerPlot(player.getUniqueId());
+                if (plot == null || !plot.contains(target.getLocation())) {
+                    player.sendMessage(Component.text("Position must be inside your plot!", NamedTextColor.RED));
+                    return;
+                }
+                pos2Map.put(player.getUniqueId(), target.getLocation());
+                player.sendMessage(Component.text("Pos 2 set: (" + target.getX() + ", " + target.getY() + ", " + target.getZ() + ")", NamedTextColor.AQUA));
+            }
+            default -> player.sendMessage(Component.text("Unknown command. Use: //set, //replace, //walls, //hollow, //line, //layer, //clear", NamedTextColor.RED));
+        }
+    }
+
+    private Material parseMaterial(String input, Player player) {
+        // Allow "hand" to use held block
+        if (input.equalsIgnoreCase("hand")) {
+            ItemStack held = player.getInventory().getItemInMainHand();
+            if (held.getType().isBlock() && held.getType() != Material.AIR) {
+                return held.getType();
+            }
+            player.sendMessage(Component.text("Hold a block in your hand!", NamedTextColor.RED));
+            return null;
+        }
+
+        Material mat = Material.matchMaterial(input);
+        if (mat == null || !mat.isBlock()) {
+            player.sendMessage(Component.text("Unknown block: " + input, NamedTextColor.RED));
+            return null;
+        }
+        return mat;
     }
 
     @EventHandler
@@ -115,13 +247,13 @@ public class ProToolManager implements Listener {
         Inventory gui = Bukkit.createInventory(null, 27,
             Component.text(PRO_TOOLS_TITLE, NamedTextColor.LIGHT_PURPLE));
 
-        gui.setItem(10, createToolItem(Material.BRICKS, "Fill", "Fill selected region with a block"));
-        gui.setItem(11, createToolItem(Material.CRAFTING_TABLE, "Replace", "Replace all of one block with another"));
-        gui.setItem(12, createToolItem(Material.COBBLESTONE_WALL, "Walls", "Create walls around selection"));
-        gui.setItem(13, createToolItem(Material.GLASS, "Hollow", "Hollow out the selection"));
-        gui.setItem(14, createToolItem(Material.STICK, "Line", "Draw a line between pos1 and pos2"));
-        gui.setItem(15, createToolItem(Material.SMOOTH_STONE_SLAB, "Layer", "Fill a single Y-layer"));
-        gui.setItem(16, createToolItem(Material.TNT, "Clear", "Clear all blocks in selection"));
+        gui.setItem(10, createToolItem(Material.BRICKS, "Fill", "Fill region (//set <block>)"));
+        gui.setItem(11, createToolItem(Material.CRAFTING_TABLE, "Replace", "Replace blocks (//replace <from> <to>)"));
+        gui.setItem(12, createToolItem(Material.COBBLESTONE_WALL, "Walls", "Create walls (//walls <block>)"));
+        gui.setItem(13, createToolItem(Material.GLASS, "Hollow", "Hollow selection (//hollow <block>)"));
+        gui.setItem(14, createToolItem(Material.STICK, "Line", "Draw line (//line <block>)"));
+        gui.setItem(15, createToolItem(Material.SMOOTH_STONE_SLAB, "Layer", "Fill Y-layer (//layer <block>)"));
+        gui.setItem(16, createToolItem(Material.TNT, "Clear", "Clear all (//clear)"));
 
         player.openInventory(gui);
     }
@@ -145,7 +277,6 @@ public class ProToolManager implements Listener {
             event.setCancelled(true);
             handleProToolClick(event, player);
         } else if (title.equals(MATERIAL_SELECT_TITLE)) {
-            event.setCancelled(true);
             handleMaterialSelect(event, player);
         }
     }
@@ -200,6 +331,7 @@ public class ProToolManager implements Listener {
         Inventory gui = Bukkit.createInventory(null, 54,
             Component.text(MATERIAL_SELECT_TITLE, NamedTextColor.GREEN));
 
+        // Fill with common blocks but leave last row empty for drag-in
         Material[] blocks = {
             Material.STONE, Material.GRANITE, Material.DIORITE, Material.ANDESITE,
             Material.COBBLESTONE, Material.OAK_PLANKS, Material.SPRUCE_PLANKS, Material.BIRCH_PLANKS,
@@ -212,28 +344,51 @@ public class ProToolManager implements Listener {
             Material.GREEN_CONCRETE, Material.CYAN_CONCRETE, Material.LIGHT_BLUE_CONCRETE, Material.BLUE_CONCRETE,
             Material.PURPLE_CONCRETE, Material.MAGENTA_CONCRETE, Material.PINK_CONCRETE, Material.BROWN_CONCRETE,
             Material.WHITE_WOOL, Material.OAK_LOG, Material.SPRUCE_LOG, Material.BIRCH_LOG,
-            Material.GLASS, Material.WHITE_STAINED_GLASS, Material.IRON_BLOCK, Material.GOLD_BLOCK,
-            Material.DIAMOND_BLOCK, Material.EMERALD_BLOCK, Material.COPPER_BLOCK, Material.AMETHYST_BLOCK,
-            Material.GLOWSTONE, Material.SEA_LANTERN
+            Material.GLASS, Material.WHITE_STAINED_GLASS
         };
 
-        for (int i = 0; i < blocks.length && i < 54; i++) {
+        for (int i = 0; i < blocks.length && i < 45; i++) {
             gui.setItem(i, new ItemStack(blocks[i]));
         }
+
+        // Info item in slot 49
+        ItemStack info = new ItemStack(Material.PAPER);
+        ItemMeta meta = info.getItemMeta();
+        meta.displayName(Component.text("Or click a block from your inventory!", NamedTextColor.YELLOW));
+        meta.lore(List.of(Component.text("Click any block in your inventory below", NamedTextColor.GRAY)));
+        info.setItemMeta(meta);
+        gui.setItem(49, info);
 
         player.openInventory(gui);
     }
 
     private void handleMaterialSelect(InventoryClickEvent event, Player player) {
+        event.setCancelled(true);
         ItemStack clicked = event.getCurrentItem();
+
+        int rawSlot = event.getRawSlot();
+
+        // Clicking in bottom inventory (player's inventory) — use that block
+        if (rawSlot >= 54) {
+            if (clicked != null && clicked.getType().isBlock() && clicked.getType() != Material.AIR) {
+                applySelectedMaterial(player, clicked.getType());
+            }
+            return;
+        }
+
+        // Clicking in top GUI
         if (clicked == null || clicked.getType() == Material.AIR) return;
+        if (clicked.getType() == Material.PAPER) return; // info item
 
         if (!clicked.getType().isBlock()) {
             player.sendMessage(Component.text("Select a block!", NamedTextColor.RED));
             return;
         }
 
-        Material mat = clicked.getType();
+        applySelectedMaterial(player, clicked.getType());
+    }
+
+    private void applySelectedMaterial(Player player, Material mat) {
         UUID uuid = player.getUniqueId();
         ProToolMode mode = playerModes.get(uuid);
         player.closeInventory();
@@ -252,7 +407,7 @@ public class ProToolManager implements Listener {
         org.bukkit.Location p2 = pos2Map.get(uuid);
 
         if (p1 == null || p2 == null) {
-            player.sendMessage(Component.text("Set both positions first! (Left/Right click with Magic Axe)", NamedTextColor.RED));
+            player.sendMessage(Component.text("Set both positions first! (Left/Right click with Magic Axe or //pos1 //pos2)", NamedTextColor.RED));
             return;
         }
 

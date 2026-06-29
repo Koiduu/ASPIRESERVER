@@ -650,6 +650,10 @@ public class GameSession {
     }
 
     private void resetSession() {
+        // Remove all players from ArenaManager's session tracking
+        for (UUID uuid : players) {
+            plugin.getArenaManager().removePlayerTracking(uuid);
+        }
         players.clear();
         playerPlotAssignments.clear();
         teams.clear();

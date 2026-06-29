@@ -9,9 +9,11 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.ItemStack;
 
 public class TradeListener implements Listener {
@@ -22,7 +24,7 @@ public class TradeListener implements Listener {
         this.tradeManager = tradeManager;
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGH)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
 
@@ -37,10 +39,6 @@ public class TradeListener implements Listener {
         }
 
         int slot = event.getRawSlot();
-
-        // Clicking in player inventory (bottom) — allow picking up items to place in offer
-        if (slot >= 54) return;
-
         boolean isP1 = player.getUniqueId().equals(session.getPlayer1());
 
         // Cancel button
@@ -69,10 +67,13 @@ public class TradeListener implements Listener {
             return;
         }
 
-        // My offer slots — allow placing/removing items
+        // My offer slots — allow placing/removing items via shift-click or normal click
         if (TradeGui.isMyOfferSlot(slot, isP1)) {
-            // Allow the click — Bukkit will handle the item swap
-            // After the click, we need to update the session
+            // Reset confirmations when offers change
+            session.setConfirmed(session.getPlayer1(), false);
+            session.setConfirmed(session.getPlayer2(), false);
+
+            // Allow the click to go through — schedule update after
             Bukkit.getScheduler().runTaskLater(
                 Bukkit.getPluginManager().getPlugin("AspireSMP"), () -> {
                     int offerIdx = TradeGui.getOfferIndex(slot, isP1);
@@ -83,8 +84,78 @@ public class TradeListener implements Listener {
             return;
         }
 
-        // Everything else is locked
+        // Clicking in player's own inventory (bottom half) — allow shift-click to move items into offer slots
+        if (slot >= 54) {
+            if (event.isShiftClick() && event.getCurrentItem() != null) {
+                event.setCancelled(true);
+                // Find first empty offer slot
+                int[] mySlots = isP1 ? TradeGui.P1_SLOTS : TradeGui.P2_SLOTS;
+                ItemStack[] myOffer = session.getOffer(player.getUniqueId());
+                for (int i = 0; i < myOffer.length; i++) {
+                    if (myOffer[i] == null) {
+                        ItemStack moving = event.getCurrentItem().clone();
+                        session.setOfferSlot(player.getUniqueId(), i, moving);
+                        event.setCurrentItem(null);
+                        session.setConfirmed(session.getPlayer1(), false);
+                        session.setConfirmed(session.getPlayer2(), false);
+                        refreshBothGuis(session);
+                        break;
+                    }
+                }
+            }
+            // Normal clicks in bottom inventory are fine (picking up items)
+            return;
+        }
+
+        // Everything else in top inventory is locked
         event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+
+        Component title = event.getView().title();
+        String titleText = PlainTextComponentSerializer.plainText().serialize(title);
+        if (!titleText.equals(TradeGui.TRADE_TITLE)) return;
+
+        TradeSession session = tradeManager.getSession(player.getUniqueId());
+        if (session == null) {
+            event.setCancelled(true);
+            return;
+        }
+
+        boolean isP1 = player.getUniqueId().equals(session.getPlayer1());
+
+        // Only allow dragging into own offer slots
+        for (int slot : event.getRawSlots()) {
+            if (slot < 54 && !TradeGui.isMyOfferSlot(slot, isP1)) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+
+        // If drag went into offer slots, update session
+        boolean touchedOfferSlots = false;
+        for (int slot : event.getRawSlots()) {
+            if (slot < 54 && TradeGui.isMyOfferSlot(slot, isP1)) {
+                touchedOfferSlots = true;
+                break;
+            }
+        }
+        if (touchedOfferSlots) {
+            session.setConfirmed(session.getPlayer1(), false);
+            session.setConfirmed(session.getPlayer2(), false);
+            Bukkit.getScheduler().runTaskLater(
+                Bukkit.getPluginManager().getPlugin("AspireSMP"), () -> {
+                    int[] mySlots = isP1 ? TradeGui.P1_SLOTS : TradeGui.P2_SLOTS;
+                    for (int i = 0; i < mySlots.length; i++) {
+                        ItemStack item = event.getView().getTopInventory().getItem(mySlots[i]);
+                        session.setOfferSlot(player.getUniqueId(), i, item);
+                    }
+                    refreshBothGuis(session);
+                }, 1L);
+        }
     }
 
     @EventHandler
@@ -104,6 +175,7 @@ public class TradeListener implements Listener {
 
         Player other = Bukkit.getPlayer(session.getOther(player.getUniqueId()));
         if (other != null) {
+            returnItems(other, session);
             other.sendMessage(Component.text(player.getName() + " cancelled the trade.", NamedTextColor.RED));
             other.closeInventory();
         }

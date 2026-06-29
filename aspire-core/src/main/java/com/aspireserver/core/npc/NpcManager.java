@@ -68,10 +68,15 @@ public class NpcManager {
             }
 
             var world = Bukkit.getWorld(worldName);
-            if (world == null) continue;
+            if (world == null) {
+                plugin.getLogger().warning("NPC '" + id + "' world '" + worldName + "' not loaded yet, will retry on spawn.");
+            }
 
-            Location loc = new Location(world, x, y, z, yaw, pitch);
+            Location loc = world != null
+                ? new Location(world, x, y, z, yaw, pitch)
+                : new Location(Bukkit.getWorlds().get(0), x, y, z, yaw, pitch);
             NpcData npc = new NpcData(id, displayName, action, loc);
+            npc.setWorldName(worldName);
             npc.setSkinName(skinName);
             npc.setCustomCommand(customCommand);
             npcs.put(id, npc);
@@ -87,7 +92,18 @@ public class NpcManager {
 
     public void spawnNpc(NpcData npc) {
         Location loc = npc.getLocation();
-        if (loc == null || loc.getWorld() == null) return;
+        if (loc == null) return;
+
+        // Re-resolve world at spawn time (Multiverse may have loaded it since config read)
+        if (npc.getWorldName() != null) {
+            var resolvedWorld = Bukkit.getWorld(npc.getWorldName());
+            if (resolvedWorld != null && !resolvedWorld.equals(loc.getWorld())) {
+                loc = new Location(resolvedWorld, loc.getX(), loc.getY(), loc.getZ(), loc.getYaw(), loc.getPitch());
+                npc.setLocation(loc);
+            }
+        }
+
+        if (loc.getWorld() == null) return;
 
         removeNpcEntity(npc);
 

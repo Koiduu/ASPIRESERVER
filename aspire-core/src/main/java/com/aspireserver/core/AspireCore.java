@@ -54,7 +54,7 @@ public final class AspireCore extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new LoadoutJoinListener(loadoutManager, this), this);
         getServer().getPluginManager().registerEvents(new WorldProtectionListener(this), this);
 
-        Bukkit.getScheduler().runTaskLater(this, () -> npcManager.spawnAllNpcs(), 20L);
+        Bukkit.getScheduler().runTaskLater(this, () -> npcManager.spawnAllNpcs(), 60L);
 
         getLogger().info(MessageUtil.PREFIX_RAW + "AspireCore enabled!");
     }

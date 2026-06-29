@@ -78,6 +78,15 @@ public class PlotRegion {
 
         Bukkit.getScheduler().runTask(
             Bukkit.getPluginManager().getPlugin("AspireBuildBattle"), () -> {
+                // Remove all non-player entities inside the plot
+                for (org.bukkit.entity.Entity entity : world.getEntities()) {
+                    if (entity instanceof org.bukkit.entity.Player) continue;
+                    if (contains(entity.getLocation())) {
+                        entity.remove();
+                    }
+                }
+
+                // Clear blocks
                 for (int x = minX + 1; x < maxX; x++) {
                     for (int z = minZ + 1; z < maxZ; z++) {
                         for (int y = minY + 1; y <= maxY; y++) {

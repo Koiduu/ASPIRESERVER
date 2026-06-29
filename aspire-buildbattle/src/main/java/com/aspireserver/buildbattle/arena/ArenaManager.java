@@ -212,6 +212,10 @@ public class ArenaManager {
         return playerSessions.get(player);
     }
 
+    public void removePlayerTracking(UUID player) {
+        playerSessions.remove(player);
+    }
+
     public void releaseArena(Arena arena) {
         arena.setInUse(false);
         activeSessions.removeIf(s -> s.getArena().equals(arena));

@@ -13,6 +13,7 @@ public class NpcData {
     private UUID entityUuid;
     private String skinName;
     private String customCommand;
+    private String worldName;
 
     public NpcData(String id, String displayName, NpcAction action, Location location) {
         this.id = id;
@@ -33,4 +34,6 @@ public class NpcData {
     public void setSkinName(String skinName) { this.skinName = skinName; }
     public String getCustomCommand() { return customCommand; }
     public void setCustomCommand(String customCommand) { this.customCommand = customCommand; }
+    public String getWorldName() { return worldName; }
+    public void setWorldName(String worldName) { this.worldName = worldName; }
 }
