@@ -589,22 +589,19 @@ public class GameSession {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             clearAllPlots();
             resetFloors();
-            warpToWaitingLobby();
+            warpToLobbyAndLeave();
             resetSession();
         }, 100L);
     }
 
-    private void warpToWaitingLobby() {
-        String plotType = arena.getPlotType();
-        Location waitingLobby = plugin.getArenaManager().getWaitingLobby(plotType);
-        for (UUID uuid : players) {
+    private void warpToLobbyAndLeave() {
+        // Warp all players to lobby and fully remove them from BB
+        for (UUID uuid : new HashSet<>(players)) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
-                if (waitingLobby != null) {
-                    player.teleport(waitingLobby);
-                } else {
-                    player.teleport(arena.getLobbySpawn());
-                }
+                // Try /lobby command location first, fall back to arena lobby
+                player.performCommand("lobby");
+                player.sendMessage(Component.text("Game over! Returned to lobby.", NamedTextColor.GREEN));
             }
         }
     }

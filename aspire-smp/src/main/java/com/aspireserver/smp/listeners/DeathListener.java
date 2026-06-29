@@ -11,6 +11,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
@@ -69,5 +70,32 @@ public class DeathListener implements Listener {
 
         plugin.getGraveyardManager().removeGraveyard(graveyard);
         player.sendMessage(Component.text("Items retrieved from graveyard!", NamedTextColor.GREEN));
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onBlockBreak(BlockBreakEvent event) {
+        if (event.getBlock().getType() != Material.SOUL_LANTERN) return;
+
+        Location blockLoc = event.getBlock().getLocation();
+        // Check if this soul lantern is a graveyard
+        for (var entry : getAllGraveyards()) {
+            Location gyLoc = entry.getLocation();
+            if (gyLoc.getWorld().equals(blockLoc.getWorld())
+                && gyLoc.getBlockX() == blockLoc.getBlockX()
+                && gyLoc.getBlockY() == blockLoc.getBlockY()
+                && gyLoc.getBlockZ() == blockLoc.getBlockZ()) {
+                event.setCancelled(true);
+                event.getPlayer().sendActionBar(Component.text(
+                    "This is a graveyard! Right-click to retrieve items.", NamedTextColor.RED));
+                return;
+            }
+        }
+    }
+
+    private java.util.List<Graveyard> getAllGraveyards() {
+        java.util.List<Graveyard> all = new java.util.ArrayList<>();
+        // Access via GraveyardManager — iterate all graveyards
+        plugin.getGraveyardManager().forEachGraveyard(all::add);
+        return all;
     }
 }

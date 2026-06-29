@@ -39,7 +39,8 @@ public class MobCapListener implements Listener {
     public void onCreatureSpawn(CreatureSpawnEvent event) {
         if (event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.CUSTOM
                 || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.SPAWNER_EGG
-                || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.COMMAND) {
+                || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.COMMAND
+                || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.BREEDING) {
             return;
         }
 

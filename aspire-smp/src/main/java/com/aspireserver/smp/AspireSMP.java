@@ -10,6 +10,7 @@ import com.aspireserver.smp.graveyard.GraveyardManager;
 import com.aspireserver.smp.listeners.ClaimListener;
 import com.aspireserver.smp.listeners.CombatLogListener;
 import com.aspireserver.smp.listeners.DeathListener;
+import com.aspireserver.smp.listeners.LootBoostListener;
 import com.aspireserver.smp.listeners.MobCapListener;
 import com.aspireserver.smp.listeners.SleepListener;
 import com.aspireserver.smp.listeners.SmpJoinListener;
@@ -78,6 +79,7 @@ public final class AspireSMP extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new TradeListener(tradeManager), this);
         getServer().getPluginManager().registerEvents(new GoldenShovelListener(claimManager, this), this);
         getServer().getPluginManager().registerEvents(new SpawnProtectionListener(this), this);
+        getServer().getPluginManager().registerEvents(new LootBoostListener(this), this);
     }
 
     public static AspireSMP getInstance() {

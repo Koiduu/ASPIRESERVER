@@ -213,6 +213,14 @@ public class GraveyardManager {
         saveAll();
     }
 
+    public void forEachGraveyard(java.util.function.Consumer<Graveyard> consumer) {
+        for (List<Graveyard> list : graveyards.values()) {
+            for (Graveyard gy : list) {
+                consumer.accept(gy);
+            }
+        }
+    }
+
     private double findSafeY(Location loc) {
         World world = loc.getWorld();
         int x = loc.getBlockX();
