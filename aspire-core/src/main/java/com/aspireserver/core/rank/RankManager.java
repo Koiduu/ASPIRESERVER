@@ -1,6 +1,8 @@
 package com.aspireserver.core.rank;
 
 import com.aspireserver.core.AspireCore;
+import com.aspireserver.core.title.BbTitle;
+import com.aspireserver.core.title.TitleManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
@@ -122,7 +124,17 @@ public class RankManager {
         Component tag = rank.formatTag(plusColor);
         TextColor nameColor = rank == Rank.DEFAULT ? NamedTextColor.GRAY : rank.getBaseColor();
 
-        return tag.append(Component.text(name, nameColor));
+        Component result = tag.append(Component.text(name, nameColor));
+
+        TitleManager titleManager = plugin.getTitleManager();
+        if (titleManager != null) {
+            BbTitle title = titleManager.getTitle(uuid);
+            if (title != null) {
+                result = result.append(Component.text(" ", NamedTextColor.GRAY)).append(title.format());
+            }
+        }
+
+        return result;
     }
 
     public Component getChatFormat(Player player, String message) {

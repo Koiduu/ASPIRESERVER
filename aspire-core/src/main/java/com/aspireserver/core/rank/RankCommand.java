@@ -160,6 +160,8 @@ public class RankCommand implements CommandExecutor, TabCompleter, Listener {
                 case 9 -> NamedTextColor.DARK_PURPLE;
                 case 10 -> NamedTextColor.WHITE;
                 case 11 -> NamedTextColor.BLACK;
+                case 12 -> NamedTextColor.DARK_RED;
+                case 13 -> NamedTextColor.DARK_BLUE;
                 default -> null;
             };
 
@@ -187,6 +189,8 @@ public class RankCommand implements CommandExecutor, TabCompleter, Listener {
         gui.setItem(9, createColorItem(Material.PURPLE_WOOL, "Dark Purple", NamedTextColor.DARK_PURPLE));
         gui.setItem(10, createColorItem(Material.WHITE_WOOL, "White", NamedTextColor.WHITE));
         gui.setItem(11, createColorItem(Material.BLACK_WOOL, "Black", NamedTextColor.BLACK));
+        gui.setItem(12, createColorItem(Material.RED_TERRACOTTA, "Dark Red", NamedTextColor.DARK_RED));
+        gui.setItem(13, createColorItem(Material.BLUE_TERRACOTTA, "Dark Blue", NamedTextColor.DARK_BLUE));
 
         admin.openInventory(gui);
     }

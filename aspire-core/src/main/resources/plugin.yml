@@ -73,6 +73,10 @@ commands:
     description: Set your nickname (ops only)
     usage: /nick <name|reset>
     permission: aspire.admin.nick
+  titlegive:
+    description: Give a Build Battle title (GUI)
+    usage: /titlegive <player> [title]
+    permission: aspire.admin.title
 
 permissions:
   aspire.admin.ban:
@@ -107,4 +111,7 @@ permissions:
     default: op
   aspire.admin.nick:
     description: Set nickname
+    default: op
+  aspire.admin.title:
+    description: Give Build Battle titles
     default: op

@@ -26,6 +26,8 @@ import com.aspireserver.core.rank.NickCommand;
 import com.aspireserver.core.rank.RankCommand;
 import com.aspireserver.core.rank.RankJoinListener;
 import com.aspireserver.core.rank.RankManager;
+import com.aspireserver.core.title.TitleCommand;
+import com.aspireserver.core.title.TitleManager;
 import com.aspireserver.core.utils.MessageUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -40,6 +42,7 @@ public final class AspireCore extends JavaPlugin {
     private NpcManager npcManager;
     private LoadoutManager loadoutManager;
     private RankManager rankManager;
+    private TitleManager titleManager;
 
     @Override
     public void onEnable() {
@@ -53,6 +56,7 @@ public final class AspireCore extends JavaPlugin {
         npcManager = new NpcManager(this);
         loadoutManager = new LoadoutManager(this);
         rankManager = new RankManager(this);
+        titleManager = new TitleManager(this);
 
         registerCommands();
         getServer().getPluginManager().registerEvents(chatManager, this);
@@ -62,6 +66,8 @@ public final class AspireCore extends JavaPlugin {
         RankCommand rankCmd = new RankCommand(rankManager);
         getServer().getPluginManager().registerEvents(rankCmd, this);
         getServer().getPluginManager().registerEvents(new RankJoinListener(rankManager), this);
+        TitleCommand titleCmd = new TitleCommand(titleManager);
+        getServer().getPluginManager().registerEvents(titleCmd, this);
 
         Bukkit.getScheduler().runTaskLater(this, () -> npcManager.spawnAllNpcs(), 60L);
 
@@ -74,6 +80,7 @@ public final class AspireCore extends JavaPlugin {
         adminManager.saveData();
         loadoutManager.save();
         rankManager.saveData();
+        titleManager.saveData();
         npcManager.despawnAll();
         npcManager.saveNpcs();
         getLogger().info(MessageUtil.PREFIX_RAW + "AspireCore disabled.");
@@ -123,6 +130,10 @@ public final class AspireCore extends JavaPlugin {
         NickCommand nickCommand = new NickCommand(rankManager);
         getCommand("nick").setExecutor(nickCommand);
         getCommand("nick").setTabCompleter(nickCommand);
+
+        TitleCommand titleCommand = new TitleCommand(titleManager);
+        getCommand("titlegive").setExecutor(titleCommand);
+        getCommand("titlegive").setTabCompleter(titleCommand);
     }
 
     public static AspireCore getInstance() {
@@ -151,5 +162,9 @@ public final class AspireCore extends JavaPlugin {
 
     public RankManager getRankManager() {
         return rankManager;
+    }
+
+    public TitleManager getTitleManager() {
+        return titleManager;
     }
 }

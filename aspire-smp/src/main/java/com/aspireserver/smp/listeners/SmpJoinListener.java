@@ -11,7 +11,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.Statistic;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Tameable;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityTeleportEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
@@ -39,6 +43,7 @@ public class SmpJoinListener implements Listener {
     private static final int IMMUNITY_SECONDS = 7;
     private static final int SLOW_CHUNK_VIEW = 15;
     private static final int NORMAL_CHUNK_VIEW = 15;
+    private static final int SCORE_THRESHOLD = 200;
 
     public SmpJoinListener(AspireSMP plugin) {
         this.plugin = plugin;
@@ -92,9 +97,10 @@ public class SmpJoinListener implements Listener {
         Player player = event.getPlayer();
         if (isSmpWorld(player.getWorld())) {
             player.setGameMode(GameMode.SURVIVAL);
-            if (!hasJoinedSmBefore(player.getUniqueId())) {
+            if (!hasJoinedSmBefore(player.getUniqueId()) && !isExperiencedPlayer(player)) {
                 handleFirstJoin(player);
             } else {
+                markFirstJoin(player.getUniqueId());
                 applyImmunity(player);
             }
             applySlowChunks(player);
@@ -109,14 +115,37 @@ public class SmpJoinListener implements Listener {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (player.isOnline() && isSmpWorld(player.getWorld())) {
                 player.setGameMode(GameMode.SURVIVAL);
-                if (!hasJoinedSmBefore(player.getUniqueId())) {
+                if (!hasJoinedSmBefore(player.getUniqueId()) && !isExperiencedPlayer(player)) {
                     handleFirstJoin(player);
                 } else {
+                    markFirstJoin(player.getUniqueId());
                     applyImmunity(player);
                 }
                 applySlowChunks(player);
             }
         }, 5L);
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onPetTeleport(EntityTeleportEvent event) {
+        Entity entity = event.getEntity();
+        if (!(entity instanceof Tameable tameable)) return;
+        if (tameable.getOwner() == null) return;
+        if (event.getTo() == null) return;
+        World fromWorld = event.getFrom().getWorld();
+        World toWorld = event.getTo().getWorld();
+        if (fromWorld == null || toWorld == null) return;
+        if (isSmpWorld(fromWorld) && !isSmpWorld(toWorld)) {
+            event.setCancelled(true);
+        }
+        if (!isSmpWorld(fromWorld) && isSmpWorld(toWorld)) {
+            event.setCancelled(true);
+        }
+    }
+
+    private boolean isExperiencedPlayer(Player player) {
+        int score = player.getStatistic(Statistic.PLAY_ONE_MINUTE) / 20;
+        return score >= SCORE_THRESHOLD;
     }
 
     private void handleFirstJoin(Player player) {
