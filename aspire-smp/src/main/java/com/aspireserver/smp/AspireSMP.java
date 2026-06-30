@@ -10,6 +10,7 @@ import com.aspireserver.smp.graveyard.GraveyardManager;
 import com.aspireserver.smp.listeners.ClaimListener;
 import com.aspireserver.smp.listeners.CombatLogListener;
 import com.aspireserver.smp.listeners.DeathListener;
+import com.aspireserver.smp.listeners.EnderDragonListener;
 import com.aspireserver.smp.listeners.AntiLagListener;
 import com.aspireserver.smp.listeners.LootBoostListener;
 import com.aspireserver.smp.listeners.MobCapListener;
@@ -82,6 +83,7 @@ public final class AspireSMP extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new SpawnProtectionListener(this), this);
         getServer().getPluginManager().registerEvents(new LootBoostListener(this), this);
         getServer().getPluginManager().registerEvents(new AntiLagListener(this), this);
+        getServer().getPluginManager().registerEvents(new EnderDragonListener(this), this);
     }
 
     public static AspireSMP getInstance() {

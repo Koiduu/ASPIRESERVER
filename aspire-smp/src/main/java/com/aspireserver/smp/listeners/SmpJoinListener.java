@@ -39,8 +39,8 @@ public class SmpJoinListener implements Listener {
     private File firstJoinFile;
     private FileConfiguration firstJoinData;
     private static final int IMMUNITY_SECONDS = 7;
-    private static final int SLOW_CHUNK_VIEW = 4;
-    private static final int NORMAL_CHUNK_VIEW = 10;
+    private static final int SLOW_CHUNK_VIEW = 15;
+    private static final int NORMAL_CHUNK_VIEW = 15;
 
     public SmpJoinListener(AspireSMP plugin) {
         this.plugin = plugin;
