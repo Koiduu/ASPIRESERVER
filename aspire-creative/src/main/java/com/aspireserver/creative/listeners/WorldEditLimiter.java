@@ -31,6 +31,11 @@ public class WorldEditLimiter implements Listener {
         this.plugin = plugin;
     }
 
+    private static final Set<String> BUILTIN_COMMANDS = Set.of(
+        "//wand", "//set", "//replace", "//walls", "//hollow",
+        "//line", "//layer", "//clear", "//pos1", "//pos2"
+    );
+
     @EventHandler(priority = EventPriority.LOWEST)
     public void onCommand(PlayerCommandPreprocessEvent event) {
         Player player = event.getPlayer();
@@ -41,6 +46,9 @@ public class WorldEditLimiter implements Listener {
 
         String message = event.getMessage().toLowerCase();
         String baseCmd = message.split(" ")[0];
+
+        // Let built-in wand commands pass through to CreativeWandManager
+        if (BUILTIN_COMMANDS.contains(baseCmd)) return;
 
         boolean isWeCommand = WE_COMMANDS.contains(baseCmd)
             || baseCmd.startsWith("//")
