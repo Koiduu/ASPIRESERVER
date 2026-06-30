@@ -11,6 +11,7 @@ import com.aspireserver.core.chat.StaffChatCommand;
 import com.aspireserver.core.commands.FlySpeedCommand;
 import com.aspireserver.core.commands.LobbyCommand;
 import com.aspireserver.core.commands.SetLobbyCommand;
+import com.aspireserver.core.listeners.LobbyProtectionListener;
 import com.aspireserver.core.listeners.WorldProtectionListener;
 import com.aspireserver.core.loadout.LoadoutCommand;
 import com.aspireserver.core.loadout.LoadoutJoinListener;
@@ -63,6 +64,7 @@ public final class AspireCore extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new NpcListener(this, npcManager), this);
         getServer().getPluginManager().registerEvents(new LoadoutJoinListener(loadoutManager, this), this);
         getServer().getPluginManager().registerEvents(new WorldProtectionListener(this), this);
+        getServer().getPluginManager().registerEvents(new LobbyProtectionListener(this), this);
         RankCommand rankCmd = new RankCommand(rankManager);
         getServer().getPluginManager().registerEvents(rankCmd, this);
         getServer().getPluginManager().registerEvents(new RankJoinListener(rankManager), this);

@@ -39,6 +39,10 @@ public class LobbyCommand implements CommandExecutor {
         World world = Bukkit.getWorld(worldName);
         if (world == null) {
             player.performCommand("mvtp " + worldName);
+            // Ensure gamemode is set after mvtp teleport completes
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (player.isOnline()) player.setGameMode(GameMode.ADVENTURE);
+            }, 10L);
             return true;
         }
 
