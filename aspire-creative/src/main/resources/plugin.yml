@@ -11,7 +11,8 @@ load: STARTUP
 commands:
   plot:
     description: Creative plot commands
-    usage: /plot <claim|home|clear|dispose|add|remove|list|info>
+    usage: /plot <claim|home|visit|clear|dispose|add|remove|list|info>
+    aliases: [p]
   creativeworld:
     description: Set creative world for a size tier
     usage: /creativeworld <small|medium|large> <worldName>
