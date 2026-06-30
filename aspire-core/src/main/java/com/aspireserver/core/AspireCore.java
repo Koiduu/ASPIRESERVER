@@ -22,6 +22,10 @@ import com.aspireserver.core.npc.NpcListener;
 import com.aspireserver.core.npc.NpcManager;
 import com.aspireserver.core.party.PartyCommand;
 import com.aspireserver.core.party.PartyManager;
+import com.aspireserver.core.rank.NickCommand;
+import com.aspireserver.core.rank.RankCommand;
+import com.aspireserver.core.rank.RankJoinListener;
+import com.aspireserver.core.rank.RankManager;
 import com.aspireserver.core.utils.MessageUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -35,6 +39,7 @@ public final class AspireCore extends JavaPlugin {
     private ChatManager chatManager;
     private NpcManager npcManager;
     private LoadoutManager loadoutManager;
+    private RankManager rankManager;
 
     @Override
     public void onEnable() {
@@ -47,12 +52,16 @@ public final class AspireCore extends JavaPlugin {
         chatManager = new ChatManager(this);
         npcManager = new NpcManager(this);
         loadoutManager = new LoadoutManager(this);
+        rankManager = new RankManager(this);
 
         registerCommands();
         getServer().getPluginManager().registerEvents(chatManager, this);
         getServer().getPluginManager().registerEvents(new NpcListener(this, npcManager), this);
         getServer().getPluginManager().registerEvents(new LoadoutJoinListener(loadoutManager, this), this);
         getServer().getPluginManager().registerEvents(new WorldProtectionListener(this), this);
+        RankCommand rankCmd = new RankCommand(rankManager);
+        getServer().getPluginManager().registerEvents(rankCmd, this);
+        getServer().getPluginManager().registerEvents(new RankJoinListener(rankManager), this);
 
         Bukkit.getScheduler().runTaskLater(this, () -> npcManager.spawnAllNpcs(), 60L);
 
@@ -64,6 +73,7 @@ public final class AspireCore extends JavaPlugin {
         friendManager.saveData();
         adminManager.saveData();
         loadoutManager.save();
+        rankManager.saveData();
         npcManager.despawnAll();
         npcManager.saveNpcs();
         getLogger().info(MessageUtil.PREFIX_RAW + "AspireCore disabled.");
@@ -105,6 +115,14 @@ public final class AspireCore extends JavaPlugin {
         LoadoutCommand loadoutCmd = new LoadoutCommand(loadoutManager);
         getCommand("loadout").setExecutor(loadoutCmd);
         getCommand("loadout").setTabCompleter(loadoutCmd);
+
+        RankCommand rankCommand = new RankCommand(rankManager);
+        getCommand("rankgive").setExecutor(rankCommand);
+        getCommand("rankgive").setTabCompleter(rankCommand);
+
+        NickCommand nickCommand = new NickCommand(rankManager);
+        getCommand("nick").setExecutor(nickCommand);
+        getCommand("nick").setTabCompleter(nickCommand);
     }
 
     public static AspireCore getInstance() {
@@ -129,5 +147,9 @@ public final class AspireCore extends JavaPlugin {
 
     public NpcManager getNpcManager() {
         return npcManager;
+    }
+
+    public RankManager getRankManager() {
+        return rankManager;
     }
 }

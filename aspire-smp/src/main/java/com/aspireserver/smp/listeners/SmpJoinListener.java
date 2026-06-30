@@ -2,7 +2,9 @@ package com.aspireserver.smp.listeners;
 
 import com.aspireserver.smp.AspireSMP;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -13,16 +15,13 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import org.bukkit.GameMode;
-import org.bukkit.inventory.ItemStack;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.Set;
-import java.util.HashSet;
 
 import java.util.Map;
 import java.util.UUID;
@@ -34,7 +33,6 @@ public class SmpJoinListener implements Listener {
 
     private final AspireSMP plugin;
     private final Map<UUID, Long> damageImmunity = new ConcurrentHashMap<>();
-    private final Set<UUID> pendingFirstSpawnKill = ConcurrentHashMap.newKeySet();
     private final Set<UUID> firstJoinPlayers;
     private File firstJoinFile;
     private FileConfiguration firstJoinData;
@@ -94,10 +92,9 @@ public class SmpJoinListener implements Listener {
         Player player = event.getPlayer();
         if (isSmpWorld(player.getWorld())) {
             player.setGameMode(GameMode.SURVIVAL);
-            if (!hasJoinedSmBefore(player.getUniqueId()) && isInventoryEmpty(player)) {
+            if (!hasJoinedSmBefore(player.getUniqueId())) {
                 handleFirstJoin(player);
             } else {
-                markFirstJoin(player.getUniqueId());
                 applyImmunity(player);
             }
             applySlowChunks(player);
@@ -112,10 +109,9 @@ public class SmpJoinListener implements Listener {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (player.isOnline() && isSmpWorld(player.getWorld())) {
                 player.setGameMode(GameMode.SURVIVAL);
-                if (!hasJoinedSmBefore(player.getUniqueId()) && isInventoryEmpty(player)) {
+                if (!hasJoinedSmBefore(player.getUniqueId())) {
                     handleFirstJoin(player);
                 } else {
-                    markFirstJoin(player.getUniqueId());
                     applyImmunity(player);
                 }
                 applySlowChunks(player);
@@ -123,40 +119,20 @@ public class SmpJoinListener implements Listener {
         }, 5L);
     }
 
-    private boolean isInventoryEmpty(Player player) {
-        for (ItemStack item : player.getInventory().getContents()) {
-            if (item != null && !item.getType().isAir()) return false;
-        }
-        return true;
-    }
-
     private void handleFirstJoin(Player player) {
-        pendingFirstSpawnKill.add(player.getUniqueId());
         markFirstJoin(player.getUniqueId());
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (player.isOnline() && isSmpWorld(player.getWorld())) {
-                player.setHealth(0);
-            }
-        }, 5L);
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onFirstJoinDeath(org.bukkit.event.entity.PlayerDeathEvent event) {
-        Player player = event.getEntity();
-        if (pendingFirstSpawnKill.contains(player.getUniqueId())) {
-            event.getDrops().clear();
-            event.setDroppedExp(0);
-            event.setKeepInventory(true);
-            event.setKeepLevel(true);
-        }
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST)
-    public void onFirstJoinRespawn(PlayerRespawnEvent event) {
-        Player player = event.getPlayer();
-        if (pendingFirstSpawnKill.remove(player.getUniqueId())) {
-            applyImmunity(player);
-        }
+        applyImmunity(player);
+        player.sendMessage(Component.empty());
+        player.sendMessage(Component.text("══════════════════════════════", NamedTextColor.GOLD));
+        player.sendMessage(Component.text("  Welcome to SMP!", NamedTextColor.GREEN).decorate(TextDecoration.BOLD));
+        player.sendMessage(Component.text("  To set your spawn correctly,", NamedTextColor.YELLOW));
+        player.sendMessage(Component.text("  please use ", NamedTextColor.YELLOW)
+                .append(Component.text("/kill", NamedTextColor.RED).decorate(TextDecoration.BOLD)
+                        .clickEvent(ClickEvent.suggestCommand("/kill")))
+                .append(Component.text(" to respawn.", NamedTextColor.YELLOW)));
+        player.sendMessage(Component.text("  (Click the red /kill text!)", NamedTextColor.GRAY));
+        player.sendMessage(Component.text("══════════════════════════════", NamedTextColor.GOLD));
+        player.sendMessage(Component.empty());
     }
 
     private void applyImmunity(Player player) {

@@ -2,6 +2,7 @@ package com.aspireserver.core.chat;
 
 import com.aspireserver.core.AspireCore;
 import com.aspireserver.core.party.Party;
+import com.aspireserver.core.rank.RankManager;
 import com.aspireserver.core.utils.MessageUtil;
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.Component;
@@ -90,6 +91,18 @@ public class ChatManager implements Listener {
             }
             String msg = PlainTextComponentSerializer.plainText().serialize(event.message());
             plugin.getPartyManager().broadcastToParty(party, "[Party] " + player.getName() + ": " + msg);
+            return;
+        }
+
+        RankManager rankManager = plugin.getRankManager();
+        if (rankManager != null) {
+            event.setCancelled(true);
+            String msg = PlainTextComponentSerializer.plainText().serialize(event.message());
+            Component formatted = rankManager.getChatFormat(player, msg);
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                p.sendMessage(formatted);
+            }
+            Bukkit.getConsoleSender().sendMessage(formatted);
         }
     }
 
