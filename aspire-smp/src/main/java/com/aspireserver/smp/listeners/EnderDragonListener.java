@@ -39,8 +39,8 @@ public class EnderDragonListener implements Listener {
             dragonsKilled.set(0);
             dragonsAlive.set(1);
 
-            // Spawn 2 additional dragons after a short delay
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            // Spawn 2 additional dragons immediately (same tick)
+            Bukkit.getScheduler().runTask(plugin, () -> {
                 World endWorld = event.getEntity().getWorld();
                 Location spawnLoc = new Location(endWorld, 0, 70, 0);
 
@@ -56,7 +56,7 @@ public class EnderDragonListener implements Listener {
 
                 Bukkit.broadcast(Component.text("3 Ender Dragons have awakened! Defeat them all!", NamedTextColor.DARK_PURPLE)
                     .decorate(TextDecoration.BOLD));
-            }, 60L); // 3 second delay
+            });
         }
     }
 

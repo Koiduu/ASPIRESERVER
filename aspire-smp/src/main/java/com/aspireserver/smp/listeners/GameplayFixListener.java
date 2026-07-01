@@ -2,6 +2,7 @@ package com.aspireserver.smp.listeners;
 
 import com.aspireserver.smp.AspireSMP;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
@@ -21,16 +22,22 @@ import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityTransformEvent;
 import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.entity.AreaEffectCloudApplyEvent;
+import org.bukkit.event.vehicle.VehicleDestroyEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class GameplayFixListener implements Listener {
 
     private final AspireSMP plugin;
+    // Track minecarts that are protected during villager transformation
+    private final Set<UUID> protectedMinecarts = ConcurrentHashMap.newKeySet();
 
     public GameplayFixListener(AspireSMP plugin) {
         this.plugin = plugin;
@@ -99,37 +106,46 @@ public class GameplayFixListener implements Listener {
 
         // Check if villager was in a vehicle (minecart)
         Entity vehicle = villager.getVehicle();
-        if (vehicle == null) return;
+        if (vehicle == null || !(vehicle instanceof Minecart)) return;
 
-        // After transformation, put the zombie villager back in the vehicle
+        // Protect this minecart from being destroyed during conversion
+        protectedMinecarts.add(vehicle.getUniqueId());
+
+        // After transformation, put the zombie villager back in the minecart
         List<Entity> transformed = event.getTransformedEntities();
         if (transformed.isEmpty()) return;
 
         Entity newEntity = transformed.get(0);
+        Location minecartLoc = vehicle.getLocation().clone();
+
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            // If the minecart survived, just add the new entity
             if (vehicle.isValid() && newEntity.isValid()) {
                 vehicle.addPassenger(newEntity);
+            } else if (newEntity.isValid()) {
+                // Minecart was destroyed — respawn it and put the zombie villager in
+                Minecart newCart = (Minecart) minecartLoc.getWorld().spawnEntity(minecartLoc, EntityType.MINECART);
+                newCart.addPassenger(newEntity);
             }
-        }, 2L);
+            protectedMinecarts.remove(vehicle.getUniqueId());
+        }, 3L);
+
+        // Also remove protection after a safety timeout
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            protectedMinecarts.remove(vehicle.getUniqueId());
+        }, 20L);
     }
 
-    // --- Fix: Trial chambers - prevent spawner mob stacking / entity overload ---
-    @EventHandler(priority = EventPriority.HIGH)
-    public void onTrialSpawn(org.bukkit.event.entity.CreatureSpawnEvent event) {
-        if (!isSmpWorld(event.getLocation().getWorld())) return;
-        if (event.getSpawnReason() != org.bukkit.event.entity.CreatureSpawnEvent.SpawnReason.TRIAL_SPAWNER) return;
-
-        // Limit trial spawner mobs to 12 within 8-block radius
-        int nearby = 0;
-        for (Entity e : event.getEntity().getNearbyEntities(8, 8, 8)) {
-            if (e instanceof LivingEntity && !(e instanceof Player)) {
-                nearby++;
-            }
-        }
-        if (nearby >= 12) {
+    // Prevent minecarts from being destroyed during villager conversion
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onVehicleDestroy(VehicleDestroyEvent event) {
+        if (!(event.getVehicle() instanceof Minecart minecart)) return;
+        if (protectedMinecarts.contains(minecart.getUniqueId())) {
             event.setCancelled(true);
         }
     }
+
+    // Trial chambers: allow normal mob spawning (TRIAL_SPAWNER reason is whitelisted)
 
     // --- Custom shulker recipe: obsidian chest ---
     private void registerShulkerRecipe() {

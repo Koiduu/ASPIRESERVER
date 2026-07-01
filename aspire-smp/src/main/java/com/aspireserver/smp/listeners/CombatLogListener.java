@@ -108,6 +108,9 @@ public class CombatLogListener implements Listener {
         Player player = event.getPlayer();
         if (!isSmpWorld(player.getWorld())) return;
         if (event.getCause() == PlayerTeleportEvent.TeleportCause.ENDER_PEARL) return;
+        if (event.getCause() == PlayerTeleportEvent.TeleportCause.END_PORTAL) return;
+        if (event.getCause() == PlayerTeleportEvent.TeleportCause.END_GATEWAY) return;
+        if (event.getCause() == PlayerTeleportEvent.TeleportCause.NETHER_PORTAL) return;
 
         if (isInCombat(player.getUniqueId())) {
             if (event.getTo() != null && !isSmpWorld(event.getTo().getWorld())) {
