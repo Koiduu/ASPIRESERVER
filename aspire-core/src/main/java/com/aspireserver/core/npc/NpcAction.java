@@ -7,6 +7,7 @@ public enum NpcAction {
     BUILD_BATTLE_PRO_TEAMS("Build Battle - Pro Teams", "bb join proteams"),
     WARP_SMP("Warp to SMP", null),
     WARP_CREATIVE("Warp to Creative", null),
+    WARP_CHAMELEON("Warp to Chameleon", null),
     WARP_LOBBY("Warp to Lobby", null),
     CUSTOM_COMMAND("Custom Command", null);
 

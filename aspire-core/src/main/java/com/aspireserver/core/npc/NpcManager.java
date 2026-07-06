@@ -1,10 +1,17 @@
 package com.aspireserver.core.npc;
 
 import com.aspireserver.core.AspireCore;
+import com.destroystokyo.paper.profile.PlayerProfile;
+import com.destroystokyo.paper.profile.ProfileProperty;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -12,9 +19,14 @@ import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Villager;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.SkullMeta;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URI;
 import java.util.*;
 
 public class NpcManager {
@@ -134,6 +146,82 @@ public class NpcManager {
         label.customName(Component.text("[" + npc.getAction().getDisplayName() + "]", NamedTextColor.YELLOW));
         label.setCustomNameVisible(true);
         label.addScoreboardTag("aspire_npc_label_" + npc.getId());
+
+        // If skin is set, apply player head with that skin's texture
+        if (npc.getSkinName() != null && !npc.getSkinName().isEmpty()) {
+            applySkinHead(npc, loc);
+        }
+    }
+
+    private void applySkinHead(NpcData npc, Location loc) {
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+            try {
+                // Resolve player name to UUID via Mojang API
+                String skinName = npc.getSkinName();
+                URI nameUri = URI.create("https://api.mojang.com/users/profiles/minecraft/" + skinName);
+                HttpURLConnection nameConn = (HttpURLConnection) nameUri.toURL().openConnection();
+                nameConn.setConnectTimeout(5000);
+                nameConn.setReadTimeout(5000);
+                if (nameConn.getResponseCode() != 200) {
+                    plugin.getLogger().warning("Could not resolve player: " + skinName);
+                    return;
+                }
+                JsonObject nameJson = JsonParser.parseReader(new InputStreamReader(nameConn.getInputStream())).getAsJsonObject();
+                String uuid = nameJson.get("id").getAsString();
+                nameConn.disconnect();
+
+                // Fetch profile with textures
+                URI profileUri = URI.create("https://sessionserver.mojang.com/session/minecraft/profile/" + uuid + "?unsigned=false");
+                HttpURLConnection profileConn = (HttpURLConnection) profileUri.toURL().openConnection();
+                profileConn.setConnectTimeout(5000);
+                profileConn.setReadTimeout(5000);
+                if (profileConn.getResponseCode() != 200) {
+                    plugin.getLogger().warning("Could not fetch profile for: " + skinName);
+                    return;
+                }
+                JsonObject profileJson = JsonParser.parseReader(new InputStreamReader(profileConn.getInputStream())).getAsJsonObject();
+                JsonArray properties = profileJson.getAsJsonArray("properties");
+                String textureValue = null;
+                String textureSignature = null;
+                for (JsonElement prop : properties) {
+                    JsonObject propObj = prop.getAsJsonObject();
+                    if ("textures".equals(propObj.get("name").getAsString())) {
+                        textureValue = propObj.get("value").getAsString();
+                        textureSignature = propObj.has("signature") ? propObj.get("signature").getAsString() : null;
+                        break;
+                    }
+                }
+                profileConn.disconnect();
+
+                if (textureValue == null) return;
+
+                final String tv = textureValue;
+                final String ts = textureSignature;
+
+                // Apply on main thread
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    // Spawn an armor stand with player head
+                    ArmorStand skinStand = (ArmorStand) loc.getWorld().spawnEntity(
+                        loc.clone().add(0, 1.5, 0), EntityType.ARMOR_STAND);
+                    skinStand.setVisible(false);
+                    skinStand.setGravity(false);
+                    skinStand.setInvulnerable(true);
+                    skinStand.setMarker(true);
+                    skinStand.setSmall(false);
+                    skinStand.addScoreboardTag("aspire_npc_label_" + npc.getId());
+
+                    ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+                    SkullMeta meta = (SkullMeta) head.getItemMeta();
+                    PlayerProfile profile = Bukkit.createProfile(UUID.randomUUID(), skinName);
+                    profile.getProperties().add(new ProfileProperty("textures", tv, ts));
+                    meta.setPlayerProfile(profile);
+                    head.setItemMeta(meta);
+                    skinStand.getEquipment().setHelmet(head);
+                });
+            } catch (Exception e) {
+                plugin.getLogger().warning("Error applying NPC skin: " + e.getMessage());
+            }
+        });
     }
 
     private void removeNpcEntity(NpcData npc) {

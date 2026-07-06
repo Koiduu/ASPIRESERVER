@@ -104,6 +104,21 @@ public class NpcListener implements Listener {
                     player.performCommand("mvtp " + worldName);
                 }
             }
+            case WARP_CHAMELEON -> {
+                player.setGameMode(GameMode.ADVENTURE);
+                String chameleonWorld = "chameleon";
+                var chameleonPlugin = Bukkit.getPluginManager().getPlugin("AspireChameleon");
+                if (chameleonPlugin != null && chameleonPlugin.isEnabled()) {
+                    chameleonWorld = chameleonPlugin.getConfig().getString("world-name", "chameleon");
+                }
+                World cWorld = Bukkit.getWorld(chameleonWorld);
+                if (cWorld != null) {
+                    player.teleport(cWorld.getSpawnLocation());
+                    MessageUtil.sendSuccess(player, "Warped to Chameleon!");
+                } else {
+                    player.performCommand("mvtp " + chameleonWorld);
+                }
+            }
             case WARP_LOBBY -> {
                 player.performCommand("lobby");
             }
