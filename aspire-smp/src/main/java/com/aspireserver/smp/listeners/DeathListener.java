@@ -17,7 +17,9 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.Material;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 public class DeathListener implements Listener {
 
@@ -30,18 +32,38 @@ public class DeathListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
-        ItemStack[] inventory = player.getInventory().getContents().clone();
+
+        // Collect ALL items: main inventory (36) + armor (4) + offhand (1)
+        List<ItemStack> allItems = new ArrayList<>();
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item != null && item.getType() != Material.AIR) {
+                allItems.add(item);
+            }
+        }
+        for (ItemStack item : player.getInventory().getArmorContents()) {
+            if (item != null && item.getType() != Material.AIR) {
+                allItems.add(item);
+            }
+        }
+        ItemStack offhand = player.getInventory().getItemInOffHand();
+        if (offhand != null && offhand.getType() != Material.AIR) {
+            allItems.add(offhand);
+        }
 
         Graveyard gy = plugin.getGraveyardManager().createGraveyard(
-            player.getUniqueId(), player.getLocation(), inventory);
+            player.getUniqueId(), player.getLocation(), allItems);
 
         if (gy != null) {
             event.getDrops().clear();
             event.setKeepInventory(false);
 
             Location loc = gy.getLocation();
-            player.sendMessage(Component.text("Your items are in a graveyard at: ", NamedTextColor.GOLD)
-                .append(Component.text(loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ(), NamedTextColor.YELLOW)));
+            if (loc != null) {
+                player.sendMessage(Component.text("Your items are in a graveyard at: ", NamedTextColor.GOLD)
+                    .append(Component.text(loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ(), NamedTextColor.YELLOW)));
+            } else {
+                player.sendMessage(Component.text("Your items are stored in a graveyard.", NamedTextColor.GOLD));
+            }
         }
     }
 
@@ -80,6 +102,7 @@ public class DeathListener implements Listener {
         // Check if this soul lantern is a graveyard
         for (var entry : getAllGraveyards()) {
             Location gyLoc = entry.getLocation();
+            if (gyLoc == null) continue;
             if (gyLoc.getWorld().equals(blockLoc.getWorld())
                 && gyLoc.getBlockX() == blockLoc.getBlockX()
                 && gyLoc.getBlockY() == blockLoc.getBlockY()

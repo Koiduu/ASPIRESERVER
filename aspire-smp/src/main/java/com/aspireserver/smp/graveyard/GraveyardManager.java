@@ -17,6 +17,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
+import java.util.logging.Level;
 
 public class GraveyardManager {
 
@@ -24,6 +25,7 @@ public class GraveyardManager {
     private final File dataFile;
     private FileConfiguration data;
     private final Map<UUID, List<Graveyard>> graveyards;
+    private FileConfiguration rawData;
 
     private static final long EXPIRY_MILLIS = 2L * 24 * 60 * 60 * 1000; // 2 days
 
@@ -63,6 +65,7 @@ public class GraveyardManager {
 
     private void cleanupTombstone(Graveyard gy) {
         Location loc = gy.getLocation();
+        if (loc == null || loc.getWorld() == null) return; // World not loaded, skip cleanup
         Block block = loc.getBlock();
         if (block.getType() == Material.SOUL_LANTERN) {
             block.setType(Material.AIR);
@@ -82,25 +85,27 @@ public class GraveyardManager {
             }
         }
         data = YamlConfiguration.loadConfiguration(dataFile);
+        rawData = YamlConfiguration.loadConfiguration(dataFile);
 
         if (data.contains("graveyards")) {
             for (String key : data.getConfigurationSection("graveyards").getKeys(false)) {
-                UUID owner = UUID.fromString(key);
+                UUID owner;
+                try {
+                    owner = UUID.fromString(key);
+                } catch (IllegalArgumentException e) {
+                    continue;
+                }
                 List<Graveyard> list = new ArrayList<>();
 
                 var section = data.getConfigurationSection("graveyards." + key);
                 if (section != null) {
                     for (String gKey : section.getKeys(false)) {
-                        String world = section.getString(gKey + ".world");
+                        String worldName = section.getString(gKey + ".world");
                         double x = section.getDouble(gKey + ".x");
                         double y = section.getDouble(gKey + ".y");
                         double z = section.getDouble(gKey + ".z");
 
-                        World w = Bukkit.getWorld(world);
-                        if (w == null) continue;
-
                         long createdAt = section.getLong(gKey + ".createdAt", System.currentTimeMillis());
-                        Location loc = new Location(w, x, y, z);
                         List<ItemStack> items = new ArrayList<>();
                         var itemSection = section.getConfigurationSection(gKey + ".items");
                         if (itemSection != null) {
@@ -110,45 +115,58 @@ public class GraveyardManager {
                             }
                         }
 
-                        Graveyard gy = new Graveyard(owner, loc, items, createdAt);
+                        // Store with world name — resolve lazily so Multiverse worlds aren't lost
+                        Graveyard gy = new Graveyard(owner, worldName, x, y, z, items, createdAt);
                         list.add(gy);
                     }
                 }
-                graveyards.put(owner, list);
+                if (!list.isEmpty()) {
+                    graveyards.put(owner, list);
+                }
             }
         }
+        plugin.getLogger().info("[Graveyard] Loaded " + graveyards.values().stream().mapToInt(List::size).sum() + " graveyards");
     }
 
     public void saveAll() {
-        data = new YamlConfiguration();
+        FileConfiguration saveData = new YamlConfiguration();
         for (Map.Entry<UUID, List<Graveyard>> entry : graveyards.entrySet()) {
             String ownerPath = "graveyards." + entry.getKey().toString();
             int i = 0;
             for (Graveyard gy : entry.getValue()) {
                 String path = ownerPath + "." + i;
-                data.set(path + ".world", gy.getLocation().getWorld().getName());
-                data.set(path + ".x", gy.getLocation().getX());
-                data.set(path + ".y", gy.getLocation().getY());
-                data.set(path + ".z", gy.getLocation().getZ());
-                data.set(path + ".createdAt", gy.getCreatedAt());
+                saveData.set(path + ".world", gy.getWorldName());
+                saveData.set(path + ".x", gy.getX());
+                saveData.set(path + ".y", gy.getY());
+                saveData.set(path + ".z", gy.getZ());
+                saveData.set(path + ".createdAt", gy.getCreatedAt());
                 int j = 0;
                 for (ItemStack item : gy.getItems()) {
-                    data.set(path + ".items." + j, item);
+                    saveData.set(path + ".items." + j, item);
                     j++;
                 }
                 i++;
             }
         }
+        // Write to temp file first, then rename — prevents corruption on crash
+        File tempFile = new File(dataFile.getParentFile(), "graveyards.yml.tmp");
         try {
-            data.save(dataFile);
+            saveData.save(tempFile);
+            // Backup existing file
+            File backupFile = new File(dataFile.getParentFile(), "graveyards.yml.bak");
+            if (dataFile.exists()) {
+                if (backupFile.exists()) backupFile.delete();
+                dataFile.renameTo(backupFile);
+            }
+            tempFile.renameTo(dataFile);
         } catch (IOException e) {
-            plugin.getLogger().severe("Could not save graveyards.yml");
+            plugin.getLogger().log(Level.SEVERE, "Could not save graveyards.yml", e);
         }
     }
 
-    public Graveyard createGraveyard(UUID owner, Location deathLoc, ItemStack[] inventory) {
+    public Graveyard createGraveyard(UUID owner, Location deathLoc, List<ItemStack> allItems) {
         List<ItemStack> items = new ArrayList<>();
-        for (ItemStack item : inventory) {
+        for (ItemStack item : allItems) {
             if (item != null && item.getType() != Material.AIR) {
                 items.add(item.clone());
             }
@@ -159,7 +177,8 @@ public class GraveyardManager {
         Location loc = deathLoc.clone();
         loc.setY(findSafeY(loc));
 
-        Graveyard graveyard = new Graveyard(owner, loc, items);
+        Graveyard graveyard = new Graveyard(owner, loc.getWorld().getName(),
+                loc.getX(), loc.getY(), loc.getZ(), items);
         graveyards.computeIfAbsent(owner, k -> new ArrayList<>()).add(graveyard);
 
         spawnTombstone(loc, owner);
@@ -189,6 +208,7 @@ public class GraveyardManager {
         for (Map.Entry<UUID, List<Graveyard>> entry : graveyards.entrySet()) {
             for (Graveyard gy : entry.getValue()) {
                 Location gyLoc = gy.getLocation();
+                if (gyLoc == null) continue;
                 if (gyLoc.getWorld().equals(location.getWorld())
                     && gyLoc.getBlockX() == location.getBlockX()
                     && gyLoc.getBlockY() == location.getBlockY()
