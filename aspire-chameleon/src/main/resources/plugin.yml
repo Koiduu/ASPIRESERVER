@@ -10,6 +10,14 @@ commands:
     description: Chameleon game commands
     usage: /camo <start|stop|menu>
     permission: aspire.chameleon.admin
+  setchameleonspawn:
+    description: Set spawn point for a chameleon map
+    usage: /setchameleonspawn <mapId>
+    permission: aspire.chameleon.admin
+  removechameleonspawn:
+    description: Remove spawn point for a chameleon map
+    usage: /removechameleonspawn <mapId>
+    permission: aspire.chameleon.admin
 
 permissions:
   aspire.chameleon.admin:

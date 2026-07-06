@@ -26,4 +26,7 @@ scale-factor: 0.35
 # Grace period in seconds where players can pick their skin
 grace-period: 30
 
+# Name of the flat world auto-created for chameleon games
+world-name: chameleon
+
 maps: {}

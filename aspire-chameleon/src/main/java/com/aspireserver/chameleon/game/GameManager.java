@@ -10,6 +10,7 @@ import com.destroystokyo.paper.profile.ProfileProperty;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
@@ -51,9 +52,17 @@ public class GameManager {
         this.gameActive = true;
         this.gracePeriodActive = true;
 
+        Location mapSpawn = configManager.getMapSpawn(mapName);
+
         for (Player player : Bukkit.getOnlinePlayers()) {
             activePlayers.add(player.getUniqueId());
             originalProfiles.put(player.getUniqueId(), player.getPlayerProfile());
+
+            // Teleport to map spawn if set
+            if (mapSpawn != null) {
+                player.teleport(mapSpawn);
+            }
+
             shrinkPlayer(player);
             openSkinMenu(player);
         }
