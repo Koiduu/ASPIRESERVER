@@ -155,5 +155,55 @@ public class ConfigManager {
         return mapsSection.getKeys(false);
     }
 
+    public void addSkin(String mapId, String skinName, String uuid) {
+        List<SkinEntry> skins = mapSkins.computeIfAbsent(mapId, k -> new ArrayList<>());
+        skins.add(new SkinEntry(skinName, uuid));
+
+        // Save to yaml
+        ConfigurationSection mapsSection = mapsConfig.getConfigurationSection("maps");
+        if (mapsSection == null) {
+            mapsSection = mapsConfig.createSection("maps");
+        }
+        ConfigurationSection mapSection = mapsSection.getConfigurationSection(mapId);
+        if (mapSection == null) {
+            mapSection = mapsSection.createSection(mapId);
+        }
+
+        List<Map<String, String>> skinsList = new ArrayList<>();
+        for (SkinEntry entry : skins) {
+            Map<String, String> map = new HashMap<>();
+            map.put("name", entry.name());
+            map.put("uuid", entry.uuid());
+            skinsList.add(map);
+        }
+        mapSection.set("skins", skinsList);
+        saveConfig();
+    }
+
+    public boolean removeSkin(String mapId, String skinName) {
+        List<SkinEntry> skins = mapSkins.get(mapId);
+        if (skins == null) return false;
+
+        boolean removed = skins.removeIf(e -> e.name().equalsIgnoreCase(skinName));
+        if (!removed) return false;
+
+        // Save to yaml
+        ConfigurationSection mapsSection = mapsConfig.getConfigurationSection("maps");
+        if (mapsSection == null) return true;
+        ConfigurationSection mapSection = mapsSection.getConfigurationSection(mapId);
+        if (mapSection == null) return true;
+
+        List<Map<String, String>> skinsList = new ArrayList<>();
+        for (SkinEntry entry : skins) {
+            Map<String, String> map = new HashMap<>();
+            map.put("name", entry.name());
+            map.put("uuid", entry.uuid());
+            skinsList.add(map);
+        }
+        mapSection.set("skins", skinsList);
+        saveConfig();
+        return true;
+    }
+
     public record SkinEntry(String name, String uuid) {}
 }

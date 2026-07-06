@@ -71,6 +71,10 @@ public class SkinCache {
         }
     }
 
+    public void fetchSkinByUuid(String uuid, String name) {
+        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> fetchSkin(uuid, name));
+    }
+
     public CachedSkin getSkin(String uuid) {
         return cache.get(uuid);
     }

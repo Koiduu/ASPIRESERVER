@@ -45,14 +45,14 @@ public class GameManager {
     public boolean startGame(String mapName) {
         if (gameActive) return false;
 
-        List<SkinEntry> skins = configManager.getSkinsForMap(mapName);
-        if (skins.isEmpty()) return false;
+        // Allow starting even without skins — spawn must be set OR map must exist in config
+        Location mapSpawn = configManager.getMapSpawn(mapName);
 
         this.currentMap = mapName;
         this.gameActive = true;
         this.gracePeriodActive = true;
 
-        Location mapSpawn = configManager.getMapSpawn(mapName);
+        List<SkinEntry> skins = configManager.getSkinsForMap(mapName);
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             activePlayers.add(player.getUniqueId());
@@ -64,13 +64,19 @@ public class GameManager {
             }
 
             shrinkPlayer(player);
-            openSkinMenu(player);
+
+            // Only open skin menu if skins are configured
+            if (!skins.isEmpty()) {
+                openSkinMenu(player);
+            }
         }
 
         Bukkit.broadcast(Component.text("[Chameleon] ", NamedTextColor.GREEN)
                 .append(Component.text("Game started on map: " + configManager.getMapDisplayName(mapName), NamedTextColor.YELLOW)));
-        Bukkit.broadcast(Component.text("[Chameleon] ", NamedTextColor.GREEN)
-                .append(Component.text("You have " + configManager.getGracePeriod() + "s to pick your camo skin!", NamedTextColor.AQUA)));
+        if (!skins.isEmpty()) {
+            Bukkit.broadcast(Component.text("[Chameleon] ", NamedTextColor.GREEN)
+                    .append(Component.text("You have " + configManager.getGracePeriod() + "s to pick your camo skin!", NamedTextColor.AQUA)));
+        }
 
         // End grace period after configured time
         graceTask = Bukkit.getScheduler().runTaskLater(plugin, () -> {
