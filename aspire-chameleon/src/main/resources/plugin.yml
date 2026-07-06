@@ -1,0 +1,20 @@
+name: AspireChameleon
+version: '1.0.0'
+main: com.aspireserver.chameleon.AspireChameleon
+api-version: '1.21'
+description: Meccha Chameleon mini-game - shrink and camouflage
+author: Aspire Team
+
+commands:
+  camo:
+    description: Chameleon game commands
+    usage: /camo <start|stop|menu>
+    permission: aspire.chameleon.admin
+
+permissions:
+  aspire.chameleon.admin:
+    description: Admin commands for chameleon game
+    default: op
+  aspire.chameleon.play:
+    description: Allows playing the chameleon game
+    default: true

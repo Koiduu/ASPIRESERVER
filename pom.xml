@@ -17,6 +17,7 @@
         <module>aspire-buildbattle</module>
         <module>aspire-smp</module>
         <module>aspire-creative</module>
+        <module>aspire-chameleon</module>
     </modules>
 
     <properties>
