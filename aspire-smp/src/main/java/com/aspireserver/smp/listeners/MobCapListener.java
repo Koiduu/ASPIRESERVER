@@ -42,7 +42,9 @@ public class MobCapListener implements Listener {
                 || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.COMMAND
                 || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.BREEDING
                 || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.TRIAL_SPAWNER
-                || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.SPAWNER) {
+                || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.SPAWNER
+                || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.INFECTION
+                || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.CURED) {
             return;
         }
 

@@ -20,9 +20,9 @@ public class ClaimManager {
     private final Map<UUID, Integer> claimTiers;
     private final Map<Long, List<Claim>> chunkIndex;
 
-    private static final int DEFAULT_CLAIM_LIMIT = 150;
-    private static final int TIER_1_LIMIT = 250;
-    private static final int TIER_2_LIMIT = 500;
+    private static final int DEFAULT_CLAIM_LIMIT = 500;
+    private static final int TIER_1_LIMIT = 1500;
+    private static final int TIER_2_LIMIT = 3500;
 
     public ClaimManager(AspireSMP plugin) {
         this.plugin = plugin;

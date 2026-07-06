@@ -26,6 +26,12 @@ commands:
   trade:
     description: Trade items safely with another player
     usage: /trade <player|accept|deny>
+  team:
+    description: Team management
+    usage: /team <create|invite|accept|leave|kick|chat|info|disband>
+  shop:
+    description: Player shop
+    usage: /shop [sell|buy|my|cancel]
 
 permissions:
   aspire.admin.smp:

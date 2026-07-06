@@ -16,23 +16,14 @@ public class TradeGui {
 
     public static final String TRADE_TITLE = "Trade";
     // Layout (6 rows = 54 slots):
-    // Row 0: P1 label(0), divider(1-3), P2 label(4), divider(5-8)
-    // Slots 9-12: P1 offer (4 slots)
-    // Slot 13: divider
-    // Slots 14-17: P2 offer (4 slots)
-    // Slots 18-21: P1 offer cont
-    // Slot 22: divider
-    // Slots 23-26: P2 offer cont
-    //
-    // Simplified layout:
-    // P1 offer slots: 10, 11, 19, 20
-    // P2 offer slots: 14, 15, 23, 24
-    // Divider column: 12, 13 (glass panes)
-    // Confirm buttons: 48 (P1 confirm), 50 (P2 confirm)
-    // Cancel: 49
+    // Row 1-3: P1 offer (left), divider (col 4), P2 offer (right)
+    // P1 offer: slots 9,10,11 + 18,19,20 + 27,28,29 (9 slots)
+    // P2 offer: slots 14,15,16 + 23,24,25 + 32,33,34 (9 slots)
+    // Divider column: 12,13,21,22,30,31
+    // Confirm/Cancel: row 5
 
-    public static final int[] P1_SLOTS = {10, 11, 19, 20};
-    public static final int[] P2_SLOTS = {14, 15, 23, 24};
+    public static final int[] P1_SLOTS = {9, 10, 11, 18, 19, 20, 27, 28, 29};
+    public static final int[] P2_SLOTS = {14, 15, 16, 23, 24, 25, 32, 33, 34};
     public static final int CONFIRM_SLOT = 49;
     public static final int CANCEL_SLOT = 45;
 
@@ -43,7 +34,7 @@ public class TradeGui {
         Inventory gui = Bukkit.createInventory(null, 54,
             Component.text(TRADE_TITLE, NamedTextColor.GOLD));
 
-        // Fill with glass panes
+        // Fill divider slots with glass panes
         ItemStack divider = createItem(Material.GRAY_STAINED_GLASS_PANE, " ");
         for (int i = 0; i < 54; i++) {
             gui.setItem(i, divider);
@@ -69,8 +60,10 @@ public class TradeGui {
         int[] theirSlots = isP1 ? P2_SLOTS : P1_SLOTS;
         ItemStack[] myOffer = session.getOffer(player.getUniqueId());
         ItemStack[] theirOffer = session.getOtherOffer(player.getUniqueId());
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < myOffer.length; i++) {
             if (myOffer[i] != null) gui.setItem(mySlots[i], myOffer[i]);
+        }
+        for (int i = 0; i < theirOffer.length; i++) {
             if (theirOffer[i] != null) gui.setItem(theirSlots[i], theirOffer[i]);
         }
 

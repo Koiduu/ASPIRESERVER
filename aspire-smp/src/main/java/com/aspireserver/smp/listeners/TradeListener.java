@@ -67,29 +67,31 @@ public class TradeListener implements Listener {
             return;
         }
 
-        // My offer slots — allow placing/removing items via shift-click or normal click
+        // My offer slots — allow placing/removing items via any click type
         if (TradeGui.isMyOfferSlot(slot, isP1)) {
             // Reset confirmations when offers change
             session.setConfirmed(session.getPlayer1(), false);
             session.setConfirmed(session.getPlayer2(), false);
 
-            // Allow the click to go through — schedule update after
+            // Allow the click to go through — schedule sync after
             Bukkit.getScheduler().runTaskLater(
                 Bukkit.getPluginManager().getPlugin("AspireSMP"), () -> {
-                    int offerIdx = TradeGui.getOfferIndex(slot, isP1);
-                    ItemStack item = event.getView().getTopInventory().getItem(slot);
-                    session.setOfferSlot(player.getUniqueId(), offerIdx, item);
+                    // Sync all offer slots from the inventory state
+                    int[] mySlots = isP1 ? TradeGui.P1_SLOTS : TradeGui.P2_SLOTS;
+                    for (int i = 0; i < mySlots.length; i++) {
+                        ItemStack item = event.getView().getTopInventory().getItem(mySlots[i]);
+                        session.setOfferSlot(player.getUniqueId(), i, item != null ? item.clone() : null);
+                    }
                     refreshBothGuis(session);
                 }, 1L);
             return;
         }
 
-        // Clicking in player's own inventory (bottom half) — allow shift-click to move items into offer slots
+        // Clicking in player's own inventory (bottom half)
         if (slot >= 54) {
             if (event.isShiftClick() && event.getCurrentItem() != null) {
                 event.setCancelled(true);
                 // Find first empty offer slot
-                int[] mySlots = isP1 ? TradeGui.P1_SLOTS : TradeGui.P2_SLOTS;
                 ItemStack[] myOffer = session.getOffer(player.getUniqueId());
                 for (int i = 0; i < myOffer.length; i++) {
                     if (myOffer[i] == null) {
@@ -103,7 +105,7 @@ public class TradeListener implements Listener {
                     }
                 }
             }
-            // Normal clicks in bottom inventory are fine (picking up items)
+            // Normal clicks in bottom inventory are fine (picking up items to place)
             return;
         }
 

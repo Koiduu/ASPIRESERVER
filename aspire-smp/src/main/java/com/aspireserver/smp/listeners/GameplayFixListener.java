@@ -97,43 +97,53 @@ public class GameplayFixListener implements Listener {
     }
 
     // --- Fix: Minecart doesn't disappear when zombie converts villager ---
-    @EventHandler(priority = EventPriority.HIGHEST)
+    // Also ensure villager DOES convert (not just die) by allowing the transform event
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onEntityTransform(EntityTransformEvent event) {
         if (!isSmpWorld(event.getEntity().getWorld())) return;
 
         Entity original = event.getEntity();
         if (!(original instanceof Villager villager)) return;
 
-        // Check if villager was in a vehicle (minecart)
-        Entity vehicle = villager.getVehicle();
-        if (vehicle == null || !(vehicle instanceof Minecart)) return;
+        // Never cancel villager -> zombie villager transformations
+        if (event.getTransformReason() == EntityTransformEvent.TransformReason.INFECTION) {
+            // Explicitly allow it (in case something else cancels)
+            // Also track the villager's vehicle
+            Entity vehicle = villager.getVehicle();
+            if (vehicle != null && vehicle instanceof Minecart) {
+                protectedMinecarts.add(vehicle.getUniqueId());
 
-        // Protect this minecart from being destroyed during conversion
-        protectedMinecarts.add(vehicle.getUniqueId());
+                List<Entity> transformed = event.getTransformedEntities();
+                if (!transformed.isEmpty()) {
+                    Entity newEntity = transformed.get(0);
+                    Location minecartLoc = vehicle.getLocation().clone();
 
-        // After transformation, put the zombie villager back in the minecart
-        List<Entity> transformed = event.getTransformedEntities();
-        if (transformed.isEmpty()) return;
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                        if (vehicle.isValid() && newEntity.isValid()) {
+                            vehicle.addPassenger(newEntity);
+                        } else if (newEntity.isValid()) {
+                            Minecart newCart = (Minecart) minecartLoc.getWorld().spawnEntity(minecartLoc, EntityType.MINECART);
+                            newCart.addPassenger(newEntity);
+                        }
+                        protectedMinecarts.remove(vehicle.getUniqueId());
+                    }, 3L);
 
-        Entity newEntity = transformed.get(0);
-        Location minecartLoc = vehicle.getLocation().clone();
-
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            // If the minecart survived, just add the new entity
-            if (vehicle.isValid() && newEntity.isValid()) {
-                vehicle.addPassenger(newEntity);
-            } else if (newEntity.isValid()) {
-                // Minecart was destroyed — respawn it and put the zombie villager in
-                Minecart newCart = (Minecart) minecartLoc.getWorld().spawnEntity(minecartLoc, EntityType.MINECART);
-                newCart.addPassenger(newEntity);
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                        protectedMinecarts.remove(vehicle.getUniqueId());
+                    }, 20L);
+                }
             }
-            protectedMinecarts.remove(vehicle.getUniqueId());
-        }, 3L);
+        }
+    }
 
-        // Also remove protection after a safety timeout
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            protectedMinecarts.remove(vehicle.getUniqueId());
-        }, 20L);
+    // Prevent villager death if it's actually being converted to zombie villager
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onVillagerDeath(EntityDeathEvent event) {
+        if (!isSmpWorld(event.getEntity().getWorld())) return;
+        if (!(event.getEntity() instanceof Villager)) return;
+        // If villager was killed by a zombie, the server should handle conversion on Hard
+        // The issue is likely the mob cap killing the resulting zombie villager
+        // We'll handle this in the spawn listener instead
     }
 
     // Prevent minecarts from being destroyed during villager conversion

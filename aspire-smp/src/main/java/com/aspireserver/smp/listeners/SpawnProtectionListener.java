@@ -59,9 +59,22 @@ public class SpawnProtectionListener implements Listener {
     public void onInteract(PlayerInteractEvent event) {
         if (event.getClickedBlock() == null) return;
         if (event.getPlayer().hasPermission("aspire.admin.bypass")) return;
+        // Only block block-modifying interactions, not item use (throwing tridents, wind charges, etc)
+        if (event.getAction() != org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK
+                && event.getAction() != org.bukkit.event.block.Action.LEFT_CLICK_BLOCK) return;
         if (isSpawnChunk(event.getClickedBlock().getLocation())) {
-            event.setCancelled(true);
-            event.getPlayer().sendActionBar(Component.text("Spawn is protected!", NamedTextColor.RED));
+            // Don't block throwing items (tridents, wind charges, etc) — only block containers/blocks
+            org.bukkit.Material blockType = event.getClickedBlock().getType();
+            if (blockType == org.bukkit.Material.CHEST || blockType == org.bukkit.Material.TRAPPED_CHEST
+                    || blockType == org.bukkit.Material.BARREL || blockType.name().contains("SHULKER_BOX")
+                    || blockType == org.bukkit.Material.FURNACE || blockType == org.bukkit.Material.CRAFTING_TABLE
+                    || blockType == org.bukkit.Material.ANVIL || blockType.name().contains("ANVIL")
+                    || blockType == org.bukkit.Material.ENCHANTING_TABLE || blockType == org.bukkit.Material.LEVER
+                    || blockType.name().contains("BUTTON") || blockType.name().contains("DOOR")
+                    || blockType.name().contains("GATE") || blockType == org.bukkit.Material.NOTE_BLOCK) {
+                event.setCancelled(true);
+                event.getPlayer().sendActionBar(Component.text("Spawn is protected!", NamedTextColor.RED));
+            }
         }
     }
 

@@ -8,8 +8,8 @@ public class TradeSession {
 
     private final UUID player1;
     private final UUID player2;
-    private final ItemStack[] player1Offer = new ItemStack[4];
-    private final ItemStack[] player2Offer = new ItemStack[4];
+    private final ItemStack[] player1Offer = new ItemStack[9];
+    private final ItemStack[] player2Offer = new ItemStack[9];
     private boolean player1Confirmed;
     private boolean player2Confirmed;
 
