@@ -66,7 +66,13 @@ public class ChameleonCommand implements CommandExecutor, TabCompleter {
                 }
                 String mapId = args[1].toLowerCase();
                 ConfigManager cfg = plugin.getConfigManager();
-                List<Player> participants = new ArrayList<>(Bukkit.getOnlinePlayers());
+                String chameleonWorld = cfg.getWorldName();
+                List<Player> participants = new ArrayList<>();
+                for (Player p : Bukkit.getOnlinePlayers()) {
+                    if (p.getWorld().getName().equalsIgnoreCase(chameleonWorld)) {
+                        participants.add(p);
+                    }
+                }
                 if (plugin.getGameManager().startGame(mapId,
                         cfg.getDefaultRoundDuration(), cfg.getDefaultHidingDuration(),
                         cfg.getDefaultSeekerCount(), participants)) {
