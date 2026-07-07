@@ -1,28 +1,15 @@
-name: AspireChameleon
+name: MecchaChameleon
 version: '1.0.0'
-main: com.aspireserver.chameleon.AspireChameleon
+main: com.aspireserver.chameleon.MecchaChameleon
 api-version: '1.21'
-description: Meccha Chameleon mini-game - shrink and camouflage
-author: Aspire Team
-
+description: Meccha Chameleon hide-and-seek mini-game
+authors: [AspireServer]
 commands:
-  camo:
-    description: Chameleon game commands
-    usage: /camo <start|stop|menu>
-    permission: aspire.chameleon.admin
-  setchameleonspawn:
-    description: Set spawn point for a chameleon map
-    usage: /setchameleonspawn <mapId>
-    permission: aspire.chameleon.admin
-  removechameleonspawn:
-    description: Remove spawn point for a chameleon map
-    usage: /removechameleonspawn <mapId>
-    permission: aspire.chameleon.admin
-
+  chameleon:
+    description: MecchaChameleon admin commands
+    usage: /chameleon <subcommand>
+    aliases: [cham, meccha]
 permissions:
-  aspire.chameleon.admin:
-    description: Admin commands for chameleon game
+  chameleon.admin:
+    description: Admin access to MecchaChameleon
     default: op
-  aspire.chameleon.play:
-    description: Allows playing the chameleon game
-    default: true

@@ -1,0 +1,9 @@
+# MecchaChameleon Configuration
+scale-factor: 0.35
+default-round-duration: 300   # seconds
+default-hiding-duration: 30   # seconds
+default-seeker-count: 1
+min-players: 2
+lobby-countdown: 30           # seconds
+quake-gun-cooldown: 60        # ticks (3 seconds)
+world-name: chameleon

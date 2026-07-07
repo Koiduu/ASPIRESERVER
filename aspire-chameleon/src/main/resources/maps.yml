@@ -1,32 +1,6 @@
-# Chameleon Maps Configuration
-# Each map has a list of skins players can switch to.
-# The UUID must be the UUID of a premium Minecraft account whose skin
-# matches the camouflage. Textures are fetched from Mojang API on boot.
-#
-# Example:
-# maps:
-#   forest_map:
-#     display-name: "Forest"
-#     skins:
-#       - name: "Oak Planks"
-#         uuid: "UUID_OF_OAK_PLANKS_SKIN_ACCOUNT"
-#       - name: "Moss Block"
-#         uuid: "UUID_OF_MOSS_BLOCK_SKIN_ACCOUNT"
-#   desert_map:
-#     display-name: "Desert"
-#     skins:
-#       - name: "Sandstone"
-#         uuid: "UUID_OF_SANDSTONE_SKIN_ACCOUNT"
-#       - name: "Sand"
-#         uuid: "UUID_OF_SAND_SKIN_ACCOUNT"
-
-# Scale factor applied to players during the game (0.0 - 1.0)
-scale-factor: 0.35
-
-# Grace period in seconds where players can pick their skin
-grace-period: 30
-
-# Name of the flat world auto-created for chameleon games
-world-name: chameleon
-
+# MecchaChameleon Maps Configuration
+# Use /chameleon map create <name> to add maps
+# Use /chameleon map addhiderspawn <map> to add hider spawn points
+# Use /chameleon map setseekerspawn <map> to set seeker spawn
+# Use /chameleon map addskin <map> <name> <uuid> to add skins
 maps: {}

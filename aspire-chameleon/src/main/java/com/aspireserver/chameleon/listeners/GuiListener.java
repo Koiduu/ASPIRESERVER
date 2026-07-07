@@ -1,10 +1,10 @@
 package com.aspireserver.chameleon.listeners;
 
-import com.aspireserver.chameleon.AspireChameleon;
+import com.aspireserver.chameleon.MecchaChameleon;
 import com.aspireserver.chameleon.config.ConfigManager;
-import com.aspireserver.chameleon.config.ConfigManager.SkinEntry;
 import com.aspireserver.chameleon.game.GameManager;
-import com.aspireserver.chameleon.skin.SkinCache;
+import com.aspireserver.chameleon.game.PlayerRole;
+import com.aspireserver.chameleon.gui.ColorPickerGui;
 import com.aspireserver.chameleon.skin.SkinCache.CachedSkin;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -21,12 +21,10 @@ import java.util.List;
 
 public class GuiListener implements Listener {
 
-    private final GameManager gameManager;
-    private final SkinCache skinCache;
+    private final MecchaChameleon plugin;
 
-    public GuiListener(GameManager gameManager, SkinCache skinCache) {
-        this.gameManager = gameManager;
-        this.skinCache = skinCache;
+    public GuiListener(MecchaChameleon plugin) {
+        this.plugin = plugin;
     }
 
     @EventHandler
@@ -36,51 +34,38 @@ public class GuiListener implements Listener {
         Component title = event.getView().title();
         String titleStr = PlainTextComponentSerializer.plainText().serialize(title);
 
-        // Handle Camo Skin Selection (in-game picking)
-        if ("Camo Skin Selection".equals(titleStr)) {
-            event.setCancelled(true);
-            handleSkinSelection(player, event);
-            return;
-        }
-
-        // Handle Skins admin GUI (remove skins)
-        if (titleStr.startsWith("Skins: ")) {
-            event.setCancelled(true);
-            handleSkinsAdmin(player, event, titleStr.substring("Skins: ".length()));
+        switch (titleStr) {
+            case "Chameleon Voting" -> {
+                event.setCancelled(true);
+                plugin.getLobbyManager().handleVote(player, event.getRawSlot());
+            }
+            case "Camo Skin Selection" -> {
+                event.setCancelled(true);
+                handleSkinSelection(player, event);
+            }
+            case "Color Picker" -> {
+                event.setCancelled(true);
+                handleColorPicker(player, event);
+            }
+            default -> {
+                if (titleStr.startsWith("Skins: ")) {
+                    event.setCancelled(true);
+                    handleSkinsAdmin(player, event, titleStr.substring("Skins: ".length()));
+                }
+            }
         }
     }
 
     private void handleSkinSelection(Player player, InventoryClickEvent event) {
-        if (!gameManager.isGameActive() || !gameManager.isGracePeriodActive()) {
+        GameManager gm = plugin.getGameManager();
+        if (!gm.isGameActive()) {
             player.closeInventory();
-            player.sendMessage(Component.text("Grace period has ended!", NamedTextColor.RED));
             return;
         }
-
-        ItemStack clicked = event.getCurrentItem();
-        if (clicked == null || !clicked.hasItemMeta()) return;
-
-        ItemMeta meta = clicked.getItemMeta();
-        List<Component> lore = meta.lore();
-        if (lore == null || lore.size() < 2) return;
-
-        // Extract UUID from lore line 2
-        String loreLine = PlainTextComponentSerializer.plainText().serialize(lore.get(1));
-        if (!loreLine.startsWith("UUID: ")) return;
-        String uuid = loreLine.substring(6).trim();
-
-        CachedSkin skin = skinCache.getSkin(uuid);
-        if (skin == null) {
-            player.sendMessage(Component.text("Skin not cached yet! Try again in a moment.", NamedTextColor.RED));
+        if (gm.getRole(player.getUniqueId()) != PlayerRole.HIDER) {
+            player.closeInventory();
             return;
         }
-
-        gameManager.applySkin(player, skin);
-        player.closeInventory();
-    }
-
-    private void handleSkinsAdmin(Player player, InventoryClickEvent event, String mapId) {
-        if (!player.hasPermission("aspire.chameleon.admin")) return;
 
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
@@ -88,47 +73,85 @@ public class GuiListener implements Listener {
         ItemMeta meta = clicked.getItemMeta();
         String displayName = PlainTextComponentSerializer.plainText().serialize(meta.displayName());
 
-        // If clicking "+ Add Skin" button, just show command help
-        if ("+ Add Skin".equals(displayName)) {
+        // Check if it's the "Color Picker" button
+        if ("Color Picker".equals(displayName)) {
             player.closeInventory();
-            player.sendMessage(Component.text("Use: /camo addskin " + mapId + " <name> <uuid>", NamedTextColor.AQUA));
-            player.sendMessage(Component.text("  name = display name (use _ for spaces)", NamedTextColor.GRAY));
-            player.sendMessage(Component.text("  uuid = UUID of Minecraft account with that skin", NamedTextColor.GRAY));
+            ColorPickerGui.open(player);
             return;
         }
 
-        // Otherwise it's a skin entry — remove it on click
         List<Component> lore = meta.lore();
-        if (lore == null || lore.isEmpty()) return;
+        if (lore == null || lore.size() < 2) return;
 
-        // Confirm it has the "Click to REMOVE" lore
-        boolean hasRemoveLore = false;
+        String loreLine = PlainTextComponentSerializer.plainText().serialize(lore.get(1));
+        if (!loreLine.startsWith("UUID: ")) return;
+        String uuid = loreLine.substring(6).trim();
+
+        CachedSkin skin = plugin.getSkinCache().getSkin(uuid);
+        if (skin == null) {
+            player.sendMessage(Component.text("Skin not cached yet!", NamedTextColor.RED));
+            return;
+        }
+
+        gm.applySkin(player, skin);
+        player.closeInventory();
+    }
+
+    private void handleColorPicker(Player player, InventoryClickEvent event) {
+        GameManager gm = plugin.getGameManager();
+        if (!gm.isGameActive() || gm.getRole(player.getUniqueId()) != PlayerRole.HIDER) {
+            player.closeInventory();
+            return;
+        }
+
+        int slot = event.getRawSlot();
+        String hex = ColorPickerGui.getHexForSlot(slot);
+        if (hex == null) return;
+
+        plugin.getCamoManager().applyColorFromHex(player, hex);
+        player.closeInventory();
+    }
+
+    private void handleSkinsAdmin(Player player, InventoryClickEvent event, String mapId) {
+        if (!player.hasPermission("chameleon.admin")) return;
+
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked == null || !clicked.hasItemMeta()) return;
+
+        ItemMeta meta = clicked.getItemMeta();
+        String displayName = PlainTextComponentSerializer.plainText().serialize(meta.displayName());
+
+        if ("+ Add Skin".equals(displayName)) {
+            player.closeInventory();
+            player.sendMessage(Component.text("Use: /chameleon map addskin " + mapId + " <name> <uuid>", NamedTextColor.AQUA));
+            return;
+        }
+
+        List<Component> lore = meta.lore();
+        if (lore == null) return;
+        boolean hasRemove = false;
         for (Component line : lore) {
-            String text = PlainTextComponentSerializer.plainText().serialize(line);
-            if (text.contains("REMOVE")) {
-                hasRemoveLore = true;
+            if (PlainTextComponentSerializer.plainText().serialize(line).contains("REMOVE")) {
+                hasRemove = true;
                 break;
             }
         }
-        if (!hasRemoveLore) return;
+        if (!hasRemove) return;
 
-        ConfigManager cfg = AspireChameleon.getInstance().getConfigManager();
-        if (cfg.removeSkin(mapId, displayName)) {
-            player.sendMessage(Component.text("[Chameleon] ", NamedTextColor.GREEN)
-                    .append(Component.text("Removed skin '" + displayName + "' from map '" + mapId + "'.", NamedTextColor.YELLOW)));
+        if (plugin.getConfigManager().removeSkin(mapId, displayName)) {
+            player.sendMessage(Component.text("[Chameleon] Removed skin '" + displayName + "'", NamedTextColor.YELLOW));
         } else {
-            player.sendMessage(Component.text("Failed to remove skin.", NamedTextColor.RED));
+            player.sendMessage(Component.text("Failed to remove.", NamedTextColor.RED));
         }
         player.closeInventory();
     }
 
     @EventHandler
-    public void onInventoryDrag(InventoryDragEvent event) {
+    public void onDrag(InventoryDragEvent event) {
         if (!(event.getWhoClicked() instanceof Player)) return;
-
-        Component title = event.getView().title();
-        String titleStr = PlainTextComponentSerializer.plainText().serialize(title);
-        if ("Camo Skin Selection".equals(titleStr) || titleStr.startsWith("Skins: ")) {
+        String titleStr = PlainTextComponentSerializer.plainText().serialize(event.getView().title());
+        if ("Chameleon Voting".equals(titleStr) || "Camo Skin Selection".equals(titleStr)
+                || "Color Picker".equals(titleStr) || titleStr.startsWith("Skins: ")) {
             event.setCancelled(true);
         }
     }

@@ -1,6 +1,6 @@
 package com.aspireserver.chameleon.config;
 
-import com.aspireserver.chameleon.AspireChameleon;
+import com.aspireserver.chameleon.MecchaChameleon;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -13,196 +13,272 @@ import java.util.*;
 
 public class ConfigManager {
 
-    private final AspireChameleon plugin;
+    private final MecchaChameleon plugin;
     private File mapsFile;
     private YamlConfiguration mapsConfig;
-    private double scaleFactor;
-    private int gracePeriod;
-    private String worldName;
-    private final Map<String, List<SkinEntry>> mapSkins = new HashMap<>();
-    private final Map<String, Location> mapSpawns = new HashMap<>();
 
-    public ConfigManager(AspireChameleon plugin) {
+    // Global settings
+    private double scaleFactor;
+    private int defaultRoundDuration; // seconds
+    private int defaultHidingDuration; // seconds
+    private int defaultSeekerCount;
+    private int minPlayers;
+    private int lobbyCountdown;
+    private int quakeGunCooldown; // ticks
+    private String worldName;
+
+    // Locations
+    private Location lobbySpawn;
+    private Location hunterRoom;
+
+    // Map data
+    private final Map<String, MapData> maps = new HashMap<>();
+
+    public ConfigManager(MecchaChameleon plugin) {
         this.plugin = plugin;
         loadConfig();
     }
 
     public void loadConfig() {
+        plugin.saveDefaultConfig();
+        plugin.reloadConfig();
+
+        scaleFactor = plugin.getConfig().getDouble("scale-factor", 0.35);
+        defaultRoundDuration = plugin.getConfig().getInt("default-round-duration", 300);
+        defaultHidingDuration = plugin.getConfig().getInt("default-hiding-duration", 30);
+        defaultSeekerCount = plugin.getConfig().getInt("default-seeker-count", 1);
+        minPlayers = plugin.getConfig().getInt("min-players", 2);
+        lobbyCountdown = plugin.getConfig().getInt("lobby-countdown", 30);
+        quakeGunCooldown = plugin.getConfig().getInt("quake-gun-cooldown", 60);
+        worldName = plugin.getConfig().getString("world-name", "chameleon");
+
+        // Load lobby spawn
+        if (plugin.getConfig().contains("lobby-spawn")) {
+            lobbySpawn = deserializeLocation(plugin.getConfig().getConfigurationSection("lobby-spawn"));
+        }
+        if (plugin.getConfig().contains("hunter-room")) {
+            hunterRoom = deserializeLocation(plugin.getConfig().getConfigurationSection("hunter-room"));
+        }
+
+        loadMaps();
+    }
+
+    private void loadMaps() {
         mapsFile = new File(plugin.getDataFolder(), "maps.yml");
         if (!mapsFile.exists()) {
             plugin.saveResource("maps.yml", false);
         }
         mapsConfig = YamlConfiguration.loadConfiguration(mapsFile);
-
-        scaleFactor = mapsConfig.getDouble("scale-factor", 0.35);
-        gracePeriod = mapsConfig.getInt("grace-period", 30);
-        worldName = mapsConfig.getString("world-name", "chameleon");
-
-        mapSkins.clear();
-        mapSpawns.clear();
+        maps.clear();
 
         ConfigurationSection mapsSection = mapsConfig.getConfigurationSection("maps");
         if (mapsSection == null) return;
 
         for (String mapId : mapsSection.getKeys(false)) {
-            ConfigurationSection mapSection = mapsSection.getConfigurationSection(mapId);
-            if (mapSection == null) continue;
+            ConfigurationSection sec = mapsSection.getConfigurationSection(mapId);
+            if (sec == null) continue;
 
-            // Load skins
-            List<SkinEntry> skins = new ArrayList<>();
-            List<?> skinsList = mapSection.getList("skins");
-            if (skinsList != null) {
-                for (Object obj : skinsList) {
-                    if (obj instanceof Map<?, ?> map) {
-                        String name = String.valueOf(map.get("name"));
-                        String uuid = String.valueOf(map.get("uuid"));
-                        if (name != null && uuid != null) {
-                            skins.add(new SkinEntry(name, uuid.replace("-", "")));
+            MapData data = new MapData(mapId);
+            data.displayName = sec.getString("display-name", mapId);
+
+            // Load hider spawns
+            if (sec.contains("hider-spawns")) {
+                List<?> spawns = sec.getList("hider-spawns");
+                if (spawns != null) {
+                    for (Object obj : spawns) {
+                        if (obj instanceof Map<?, ?> m) {
+                            Location loc = deserializeLocationMap(m);
+                            if (loc != null) data.hiderSpawns.add(loc);
                         }
                     }
                 }
             }
-            mapSkins.put(mapId, skins);
 
-            // Load spawn location
-            if (mapSection.contains("spawn")) {
-                ConfigurationSection spawnSection = mapSection.getConfigurationSection("spawn");
-                if (spawnSection != null) {
-                    String spawnWorldName = spawnSection.getString("world", worldName);
-                    double x = spawnSection.getDouble("x");
-                    double y = spawnSection.getDouble("y");
-                    double z = spawnSection.getDouble("z");
-                    float yaw = (float) spawnSection.getDouble("yaw", 0);
-                    float pitch = (float) spawnSection.getDouble("pitch", 0);
-                    World world = Bukkit.getWorld(spawnWorldName);
-                    if (world != null) {
-                        mapSpawns.put(mapId, new Location(world, x, y, z, yaw, pitch));
+            // Load seeker spawn
+            if (sec.contains("seeker-spawn")) {
+                data.seekerSpawn = deserializeLocation(sec.getConfigurationSection("seeker-spawn"));
+            }
+
+            // Load skins
+            List<?> skinsList = sec.getList("skins");
+            if (skinsList != null) {
+                for (Object obj : skinsList) {
+                    if (obj instanceof Map<?, ?> m) {
+                        String name = String.valueOf(m.get("name"));
+                        String uuid = String.valueOf(m.get("uuid"));
+                        if (name != null && uuid != null) {
+                            data.skins.add(new SkinEntry(name, uuid.replace("-", "")));
+                        }
                     }
                 }
             }
+
+            maps.put(mapId, data);
         }
     }
 
-    public void setMapSpawn(String mapId, Location location) {
-        mapSpawns.put(mapId, location);
+    // --- Save methods ---
 
-        // Ensure map section exists
-        ConfigurationSection mapsSection = mapsConfig.getConfigurationSection("maps");
-        if (mapsSection == null) {
-            mapsSection = mapsConfig.createSection("maps");
-        }
-        ConfigurationSection mapSection = mapsSection.getConfigurationSection(mapId);
-        if (mapSection == null) {
-            mapSection = mapsSection.createSection(mapId);
-        }
-
-        ConfigurationSection spawnSection = mapSection.createSection("spawn");
-        spawnSection.set("world", location.getWorld().getName());
-        spawnSection.set("x", location.getX());
-        spawnSection.set("y", location.getY());
-        spawnSection.set("z", location.getZ());
-        spawnSection.set("yaw", location.getYaw());
-        spawnSection.set("pitch", location.getPitch());
-
-        saveConfig();
+    public void setLobbySpawn(Location loc) {
+        this.lobbySpawn = loc;
+        serializeLocation(plugin.getConfig().createSection("lobby-spawn"), loc);
+        plugin.saveConfig();
     }
 
-    public void removeMapSpawn(String mapId) {
-        mapSpawns.remove(mapId);
-
-        ConfigurationSection mapsSection = mapsConfig.getConfigurationSection("maps");
-        if (mapsSection == null) return;
-        ConfigurationSection mapSection = mapsSection.getConfigurationSection(mapId);
-        if (mapSection == null) return;
-
-        mapSection.set("spawn", null);
-        saveConfig();
+    public void setHunterRoom(Location loc) {
+        this.hunterRoom = loc;
+        serializeLocation(plugin.getConfig().createSection("hunter-room"), loc);
+        plugin.saveConfig();
     }
 
-    public Location getMapSpawn(String mapId) {
-        return mapSpawns.get(mapId);
+    public void createMap(String mapId) {
+        maps.put(mapId, new MapData(mapId));
+        ConfigurationSection sec = mapsConfig.getConfigurationSection("maps");
+        if (sec == null) sec = mapsConfig.createSection("maps");
+        sec.createSection(mapId).set("display-name", mapId);
+        saveMaps();
     }
 
-    private void saveConfig() {
-        try {
-            mapsConfig.save(mapsFile);
-        } catch (IOException e) {
-            plugin.getLogger().warning("[ConfigManager] Failed to save maps.yml: " + e.getMessage());
-        }
+    public void addHiderSpawn(String mapId, Location loc) {
+        MapData data = maps.get(mapId);
+        if (data == null) return;
+        data.hiderSpawns.add(loc);
+        saveMapSpawns(mapId, data);
     }
 
-    public double getScaleFactor() { return scaleFactor; }
-    public int getGracePeriod() { return gracePeriod; }
-    public String getWorldName() { return worldName; }
+    public void setSeekerSpawn(String mapId, Location loc) {
+        MapData data = maps.get(mapId);
+        if (data == null) return;
+        data.seekerSpawn = loc;
 
-    public Set<String> getMapNames() { return mapSkins.keySet(); }
-
-    public List<SkinEntry> getSkinsForMap(String mapId) {
-        return mapSkins.getOrDefault(mapId, Collections.emptyList());
+        ConfigurationSection sec = getOrCreateMapSection(mapId);
+        serializeLocation(sec.createSection("seeker-spawn"), loc);
+        saveMaps();
     }
 
-    public String getMapDisplayName(String mapId) {
-        ConfigurationSection mapsSection = mapsConfig.getConfigurationSection("maps");
-        if (mapsSection == null) return mapId;
-        ConfigurationSection mapSection = mapsSection.getConfigurationSection(mapId);
-        if (mapSection == null) return mapId;
-        return mapSection.getString("display-name", mapId);
-    }
-
-    public Set<String> getAllMapIds() {
-        ConfigurationSection mapsSection = mapsConfig.getConfigurationSection("maps");
-        if (mapsSection == null) return Collections.emptySet();
-        return mapsSection.getKeys(false);
-    }
-
-    public void addSkin(String mapId, String skinName, String uuid) {
-        List<SkinEntry> skins = mapSkins.computeIfAbsent(mapId, k -> new ArrayList<>());
-        skins.add(new SkinEntry(skinName, uuid));
-
-        // Save to yaml
-        ConfigurationSection mapsSection = mapsConfig.getConfigurationSection("maps");
-        if (mapsSection == null) {
-            mapsSection = mapsConfig.createSection("maps");
-        }
-        ConfigurationSection mapSection = mapsSection.getConfigurationSection(mapId);
-        if (mapSection == null) {
-            mapSection = mapsSection.createSection(mapId);
-        }
-
-        List<Map<String, String>> skinsList = new ArrayList<>();
-        for (SkinEntry entry : skins) {
-            Map<String, String> map = new HashMap<>();
-            map.put("name", entry.name());
-            map.put("uuid", entry.uuid());
-            skinsList.add(map);
-        }
-        mapSection.set("skins", skinsList);
-        saveConfig();
+    public void addSkin(String mapId, String name, String uuid) {
+        MapData data = maps.computeIfAbsent(mapId, MapData::new);
+        data.skins.add(new SkinEntry(name, uuid));
+        saveMapSkins(mapId, data);
     }
 
     public boolean removeSkin(String mapId, String skinName) {
-        List<SkinEntry> skins = mapSkins.get(mapId);
-        if (skins == null) return false;
+        MapData data = maps.get(mapId);
+        if (data == null) return false;
+        boolean removed = data.skins.removeIf(e -> e.name().equalsIgnoreCase(skinName));
+        if (removed) saveMapSkins(mapId, data);
+        return removed;
+    }
 
-        boolean removed = skins.removeIf(e -> e.name().equalsIgnoreCase(skinName));
-        if (!removed) return false;
-
-        // Save to yaml
-        ConfigurationSection mapsSection = mapsConfig.getConfigurationSection("maps");
-        if (mapsSection == null) return true;
-        ConfigurationSection mapSection = mapsSection.getConfigurationSection(mapId);
-        if (mapSection == null) return true;
-
-        List<Map<String, String>> skinsList = new ArrayList<>();
-        for (SkinEntry entry : skins) {
-            Map<String, String> map = new HashMap<>();
-            map.put("name", entry.name());
-            map.put("uuid", entry.uuid());
-            skinsList.add(map);
+    private void saveMapSpawns(String mapId, MapData data) {
+        ConfigurationSection sec = getOrCreateMapSection(mapId);
+        List<Map<String, Object>> spawnList = new ArrayList<>();
+        for (Location l : data.hiderSpawns) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("world", l.getWorld().getName());
+            m.put("x", l.getX());
+            m.put("y", l.getY());
+            m.put("z", l.getZ());
+            m.put("yaw", (double) l.getYaw());
+            m.put("pitch", (double) l.getPitch());
+            spawnList.add(m);
         }
-        mapSection.set("skins", skinsList);
-        saveConfig();
-        return true;
+        sec.set("hider-spawns", spawnList);
+        saveMaps();
+    }
+
+    private void saveMapSkins(String mapId, MapData data) {
+        ConfigurationSection sec = getOrCreateMapSection(mapId);
+        List<Map<String, String>> skinsList = new ArrayList<>();
+        for (SkinEntry e : data.skins) {
+            Map<String, String> m = new LinkedHashMap<>();
+            m.put("name", e.name());
+            m.put("uuid", e.uuid());
+            skinsList.add(m);
+        }
+        sec.set("skins", skinsList);
+        saveMaps();
+    }
+
+    private ConfigurationSection getOrCreateMapSection(String mapId) {
+        ConfigurationSection sec = mapsConfig.getConfigurationSection("maps");
+        if (sec == null) sec = mapsConfig.createSection("maps");
+        ConfigurationSection mapSec = sec.getConfigurationSection(mapId);
+        if (mapSec == null) mapSec = sec.createSection(mapId);
+        return mapSec;
+    }
+
+    private void saveMaps() {
+        try {
+            mapsConfig.save(mapsFile);
+        } catch (IOException e) {
+            plugin.getLogger().warning("Failed to save maps.yml: " + e.getMessage());
+        }
+    }
+
+    // --- Location serialization ---
+
+    private void serializeLocation(ConfigurationSection sec, Location loc) {
+        sec.set("world", loc.getWorld().getName());
+        sec.set("x", loc.getX());
+        sec.set("y", loc.getY());
+        sec.set("z", loc.getZ());
+        sec.set("yaw", (double) loc.getYaw());
+        sec.set("pitch", (double) loc.getPitch());
+    }
+
+    private Location deserializeLocation(ConfigurationSection sec) {
+        if (sec == null) return null;
+        String wName = sec.getString("world", worldName);
+        World w = Bukkit.getWorld(wName);
+        if (w == null) return null;
+        return new Location(w, sec.getDouble("x"), sec.getDouble("y"), sec.getDouble("z"),
+                (float) sec.getDouble("yaw"), (float) sec.getDouble("pitch"));
+    }
+
+    private Location deserializeLocationMap(Object obj) {
+        if (!(obj instanceof Map<?, ?> m)) return null;
+        Object worldObj = m.get("world");
+        String wName = worldObj != null ? String.valueOf(worldObj) : worldName;
+        World w = Bukkit.getWorld(wName);
+        if (w == null) return null;
+        double x = ((Number) m.get("x")).doubleValue();
+        double y = ((Number) m.get("y")).doubleValue();
+        double z = ((Number) m.get("z")).doubleValue();
+        double yaw = m.containsKey("yaw") ? ((Number) m.get("yaw")).doubleValue() : 0;
+        double pitch = m.containsKey("pitch") ? ((Number) m.get("pitch")).doubleValue() : 0;
+        return new Location(w, x, y, z, (float) yaw, (float) pitch);
+    }
+
+    // --- Getters ---
+
+    public double getScaleFactor() { return scaleFactor; }
+    public int getDefaultRoundDuration() { return defaultRoundDuration; }
+    public int getDefaultHidingDuration() { return defaultHidingDuration; }
+    public int getDefaultSeekerCount() { return defaultSeekerCount; }
+    public int getMinPlayers() { return minPlayers; }
+    public int getLobbyCountdown() { return lobbyCountdown; }
+    public int getQuakeGunCooldown() { return quakeGunCooldown; }
+    public String getWorldName() { return worldName; }
+    public Location getLobbySpawn() { return lobbySpawn; }
+    public Location getHunterRoom() { return hunterRoom; }
+    public Map<String, MapData> getMaps() { return maps; }
+    public MapData getMap(String id) { return maps.get(id); }
+    public Set<String> getMapIds() { return maps.keySet(); }
+
+    // --- Inner classes ---
+
+    public static class MapData {
+        public final String id;
+        public String displayName;
+        public final List<Location> hiderSpawns = new ArrayList<>();
+        public Location seekerSpawn;
+        public final List<SkinEntry> skins = new ArrayList<>();
+
+        public MapData(String id) {
+            this.id = id;
+            this.displayName = id;
+        }
     }
 
     public record SkinEntry(String name, String uuid) {}
