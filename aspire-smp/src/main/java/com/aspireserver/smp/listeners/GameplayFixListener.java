@@ -23,12 +23,20 @@ import org.bukkit.event.entity.EntityTransformEvent;
 import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.entity.AreaEffectCloudApplyEvent;
 import org.bukkit.event.vehicle.VehicleDestroyEvent;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.ShapedRecipe;
+import org.bukkit.inventory.ShapelessRecipe;
+import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+import org.bukkit.potion.PotionType;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.block.Action;
+import org.bukkit.util.Vector;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,9 +47,13 @@ public class GameplayFixListener implements Listener {
     // Track minecarts that are protected during villager transformation
     private final Set<UUID> protectedMinecarts = ConcurrentHashMap.newKeySet();
 
+    private final Map<UUID, Long> riptideCooldown = new ConcurrentHashMap<>();
+
     public GameplayFixListener(AspireSMP plugin) {
         this.plugin = plugin;
         registerShulkerRecipe();
+        registerHorseArmorRecipes();
+        registerTippedArrowRecipes();
     }
 
     private boolean isSmpWorld(World world) {
@@ -157,20 +169,92 @@ public class GameplayFixListener implements Listener {
 
     // Trial chambers: allow normal mob spawning (TRIAL_SPAWNER reason is whitelisted)
 
+    // --- Trident/Spear riptide boost: allow even without rain/water ---
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onTridentUse(PlayerInteractEvent event) {
+        if (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        Player player = event.getPlayer();
+        if (!isSmpWorld(player.getWorld())) return;
+
+        ItemStack item = player.getInventory().getItemInMainHand();
+        if (item.getType() != Material.TRIDENT) return;
+        if (!item.containsEnchantment(Enchantment.RIPTIDE)) return;
+
+        // Only boost if player is NOT in water/rain (vanilla handles those cases)
+        if (player.isInWater() || player.getWorld().hasStorm()) return;
+
+        UUID uuid = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        if (now - riptideCooldown.getOrDefault(uuid, 0L) < 1500) return;
+        riptideCooldown.put(uuid, now);
+
+        int level = item.getEnchantmentLevel(Enchantment.RIPTIDE);
+        Vector direction = player.getLocation().getDirection().normalize();
+        double power = 1.5 + (level * 0.5);
+        player.setVelocity(direction.multiply(power));
+        player.getWorld().playSound(player.getLocation(), org.bukkit.Sound.ITEM_TRIDENT_RIPTIDE_3, 1.0f, 1.0f);
+    }
+
     // --- Custom shulker recipe: obsidian chest ---
     private void registerShulkerRecipe() {
         NamespacedKey key = new NamespacedKey(plugin, "obsidian_shulker");
-
-        // Remove if already exists (reload safety)
         Bukkit.removeRecipe(key);
 
         ItemStack result = new ItemStack(Material.SHULKER_BOX, 1);
-
         ShapedRecipe recipe = new ShapedRecipe(key, result);
         recipe.shape("OOO", "O O", "OOO");
         recipe.setIngredient('O', Material.OBSIDIAN);
 
         Bukkit.addRecipe(recipe);
-        plugin.getLogger().info("[AspireSMP] Registered obsidian shulker box recipe");
+    }
+
+    // --- Horse armor crafting recipes ---
+    private void registerHorseArmorRecipes() {
+        registerHorseArmor("iron_horse_armor", Material.IRON_HORSE_ARMOR, Material.IRON_INGOT);
+        registerHorseArmor("golden_horse_armor", Material.GOLDEN_HORSE_ARMOR, Material.GOLD_INGOT);
+        registerHorseArmor("diamond_horse_armor", Material.DIAMOND_HORSE_ARMOR, Material.DIAMOND);
+        plugin.getLogger().info("[AspireSMP] Registered horse armor recipes");
+    }
+
+    private void registerHorseArmor(String id, Material result, Material ingot) {
+        NamespacedKey key = new NamespacedKey(plugin, id);
+        Bukkit.removeRecipe(key);
+
+        ShapedRecipe recipe = new ShapedRecipe(key, new ItemStack(result, 1));
+        recipe.shape("  I", "ILI", "III");
+        recipe.setIngredient('I', ingot);
+        recipe.setIngredient('L', Material.LEATHER);
+
+        Bukkit.addRecipe(recipe);
+    }
+
+    // --- Tipped arrow crafting: arrow + potion ---
+    private void registerTippedArrowRecipes() {
+        PotionType[] potionTypes = {
+            PotionType.NIGHT_VISION, PotionType.INVISIBILITY, PotionType.LEAPING,
+            PotionType.FIRE_RESISTANCE, PotionType.SWIFTNESS, PotionType.SLOWNESS,
+            PotionType.WATER_BREATHING, PotionType.HEALING, PotionType.HARMING,
+            PotionType.POISON, PotionType.REGENERATION, PotionType.STRENGTH,
+            PotionType.WEAKNESS, PotionType.TURTLE_MASTER, PotionType.SLOW_FALLING
+        };
+
+        for (PotionType type : potionTypes) {
+            String name = type.name().toLowerCase();
+            NamespacedKey key = new NamespacedKey(plugin, "tipped_arrow_" + name);
+            Bukkit.removeRecipe(key);
+
+            ItemStack result = new ItemStack(Material.TIPPED_ARROW, 8);
+            PotionMeta resultMeta = (PotionMeta) result.getItemMeta();
+            resultMeta.setBasePotionType(type);
+            result.setItemMeta(resultMeta);
+
+            ShapedRecipe recipe = new ShapedRecipe(key, result);
+            recipe.shape("AAA", "APA", "AAA");
+            recipe.setIngredient('A', Material.ARROW);
+            recipe.setIngredient('P', Material.LINGERING_POTION);
+
+            Bukkit.addRecipe(recipe);
+        }
+        plugin.getLogger().info("[AspireSMP] Registered tipped arrow recipes");
     }
 }

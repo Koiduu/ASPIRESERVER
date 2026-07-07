@@ -9,6 +9,7 @@ import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.scoreboard.*;
+import org.bukkit.scoreboard.Team;
 
 import java.util.UUID;
 
@@ -36,6 +37,15 @@ public class ScoreboardManager {
         Objective obj = board.registerNewObjective("chameleon", Criteria.DUMMY,
                 Component.text("CHAMELEON", NamedTextColor.GREEN, TextDecoration.BOLD));
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
+
+        // Add nametag hiding team to this custom scoreboard
+        Team hideTeam = board.registerNewTeam("cham_hidden");
+        hideTeam.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.NEVER);
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (gm.isParticipant(p.getUniqueId())) {
+                hideTeam.addPlayer(p);
+            }
+        }
 
         int line = 8;
 

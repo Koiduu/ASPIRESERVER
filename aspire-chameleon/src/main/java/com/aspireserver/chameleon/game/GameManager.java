@@ -405,15 +405,26 @@ public class GameManager {
         scoreboardManager.clearAll();
         restoreNametags();
 
-        // Teleport everyone back to lobby
+        // Teleport everyone back to lobby and auto-restart
         Location lobby = configManager.getLobbySpawn();
-        if (lobby != null) {
-            for (Player p : Bukkit.getOnlinePlayers()) {
-                if (isInChameleonWorld(p)) {
+        List<Player> chameleonPlayers = new ArrayList<>();
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            if (isInChameleonWorld(p)) {
+                chameleonPlayers.add(p);
+                if (lobby != null) {
                     p.teleport(lobby);
                 }
             }
         }
+
+        // Re-add players to lobby with voting paper after a short delay
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            for (Player p : chameleonPlayers) {
+                if (p.isOnline() && isInChameleonWorld(p)) {
+                    plugin.getLobbyManager().addPlayer(p);
+                }
+            }
+        }, 40L); // 2 second delay before new lobby starts
     }
 
     public void restorePlayer(Player player) {

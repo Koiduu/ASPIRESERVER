@@ -28,10 +28,26 @@ public class ShopCommand implements CommandExecutor, TabCompleter {
         this.shopManager = shopManager;
     }
 
+    private boolean isSmpWorld(org.bukkit.World world) {
+        var smpPlugin = org.bukkit.Bukkit.getPluginManager().getPlugin("AspireSMP");
+        if (smpPlugin != null && smpPlugin.isEnabled()) {
+            String smpWorld = smpPlugin.getConfig().getString("smp-world", "");
+            if (!smpWorld.isEmpty()) {
+                return world.getName().equalsIgnoreCase(smpWorld);
+            }
+        }
+        return false;
+    }
+
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage("Only players can use this command.");
+            return true;
+        }
+
+        if (!isSmpWorld(player.getWorld())) {
+            player.sendMessage(Component.text("You can only use /shop in the SMP world!", NamedTextColor.RED));
             return true;
         }
 
