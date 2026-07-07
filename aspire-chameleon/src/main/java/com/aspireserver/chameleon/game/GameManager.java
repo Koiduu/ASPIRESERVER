@@ -428,6 +428,9 @@ public class GameManager {
     }
 
     public void restorePlayer(Player player) {
+        // Clean up free-cam if active
+        plugin.getHiderItemListener().cleanupFreeCam(player);
+
         restoreScale(player);
         player.getInventory().clear();
         player.getInventory().setArmorContents(null);

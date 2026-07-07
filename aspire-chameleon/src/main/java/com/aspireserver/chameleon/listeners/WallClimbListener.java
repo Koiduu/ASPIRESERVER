@@ -27,33 +27,45 @@ public class WallClimbListener implements Listener {
         if (!gm.isParticipant(player.getUniqueId())) return;
         if (gm.isFrozen(player.getUniqueId())) return;
 
-        // Check if player is pressing forward against a wall
-        if (!player.isSprinting() && !isMovingForward(event)) return;
+        // Check if player is moving horizontally (pressing into a wall)
+        if (!isMovingForward(event)) return;
 
         Location eyeLoc = player.getEyeLocation();
-        Vector direction = eyeLoc.getDirection();
+        Vector direction = eyeLoc.getDirection().clone();
         direction.setY(0).normalize();
 
         // Check block in front at feet level
-        Location ahead = player.getLocation().add(direction.multiply(0.4));
+        Location ahead = player.getLocation().add(direction.clone().multiply(0.4));
         Block blockAhead = ahead.getBlock();
 
         if (blockAhead.getType().isSolid()) {
-            // Check if there's air above
-            Block above = blockAhead.getRelative(BlockFace.UP);
-            if (!above.getType().isSolid()) {
-                // Apply upward velocity (climbing)
-                Vector vel = player.getVelocity();
-                vel.setY(0.2);
-                player.setVelocity(vel);
-                player.setFallDistance(0);
+            // Ladder-like climbing: smooth upward movement based on look direction
+            Vector vel = player.getVelocity();
+            double lookY = player.getLocation().getDirection().getY();
+
+            if (player.isSneaking()) {
+                // Sneak = descend slowly
+                vel.setY(-0.1);
+            } else if (lookY > 0.1) {
+                // Looking up = climb up (ladder speed)
+                vel.setY(0.15);
+            } else if (lookY < -0.3) {
+                // Looking down = descend
+                vel.setY(-0.1);
+            } else {
+                // Neutral look = hold position (no gravity)
+                vel.setY(0.0);
             }
+
+            // Preserve horizontal movement speed (don't slow down)
+            player.setVelocity(vel);
+            player.setFallDistance(0);
         }
     }
 
     private boolean isMovingForward(PlayerMoveEvent event) {
         double dx = event.getTo().getX() - event.getFrom().getX();
         double dz = event.getTo().getZ() - event.getFrom().getZ();
-        return dx * dx + dz * dz > 0.001;
+        return dx * dx + dz * dz > 0.0001;
     }
 }

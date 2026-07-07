@@ -12,6 +12,8 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -89,6 +91,25 @@ public class ChameleonCommand implements CommandExecutor, TabCompleter {
                 }
                 plugin.getGameManager().forceStop();
                 player.sendMessage(Component.text("[Chameleon] Game stopped.", NamedTextColor.GREEN));
+            }
+            case "removespot" -> {
+                if (!player.hasPermission("chameleon.admin")) return noPermission(player);
+                ArmorStand closest = null;
+                double closestDist = Double.MAX_VALUE;
+                for (Entity entity : player.getNearbyEntities(20, 20, 20)) {
+                    if (!(entity instanceof ArmorStand as)) continue;
+                    double dist = entity.getLocation().distanceSquared(player.getLocation());
+                    if (dist < closestDist) {
+                        closestDist = dist;
+                        closest = as;
+                    }
+                }
+                if (closest != null) {
+                    closest.remove();
+                    player.sendMessage(Component.text("[Chameleon] Removed closest armor stand (" + String.format("%.1f", Math.sqrt(closestDist)) + " blocks away)", NamedTextColor.GREEN));
+                } else {
+                    player.sendMessage(Component.text("No armor stands found within 20 blocks.", NamedTextColor.RED));
+                }
             }
             case "skins" -> {
                 if (!player.hasPermission("chameleon.admin")) return noPermission(player);
@@ -225,6 +246,7 @@ public class ChameleonCommand implements CommandExecutor, TabCompleter {
         player.sendMessage(Component.text("/chameleon skins <map> — GUI to manage skins", NamedTextColor.AQUA));
         player.sendMessage(Component.text("/chameleon forcestart <map>", NamedTextColor.AQUA));
         player.sendMessage(Component.text("/chameleon stop", NamedTextColor.AQUA));
+        player.sendMessage(Component.text("/chameleon removespot — remove closest armor stand", NamedTextColor.AQUA));
     }
 
     private boolean noPermission(Player player) {
@@ -236,7 +258,7 @@ public class ChameleonCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, String[] args) {
         List<String> completions = new ArrayList<>();
         if (args.length == 1) {
-            completions.addAll(List.of("setlobby", "sethunterroom", "map", "forcestart", "stop", "skins"));
+            completions.addAll(List.of("setlobby", "sethunterroom", "map", "forcestart", "stop", "skins", "removespot"));
         } else if (args.length == 2) {
             if ("map".equalsIgnoreCase(args[0])) {
                 completions.addAll(List.of("create", "addhiderspawn", "setseekerspawn", "addskin", "removeskin"));
