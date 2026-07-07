@@ -19,7 +19,6 @@ public class MecchaChameleon extends JavaPlugin {
     private GameManager gameManager;
     private LobbyManager lobbyManager;
     private ScoreboardManager scoreboardManager;
-    private HiderItemListener hiderItemListener;
 
     @Override
     public void onEnable() {
@@ -41,8 +40,7 @@ public class MecchaChameleon extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new LobbyListener(this), this);
         getServer().getPluginManager().registerEvents(new GameListener(this), this);
         getServer().getPluginManager().registerEvents(new GuiListener(this), this);
-        hiderItemListener = new HiderItemListener(this);
-        getServer().getPluginManager().registerEvents(hiderItemListener, this);
+        getServer().getPluginManager().registerEvents(new HiderItemListener(this), this);
         getServer().getPluginManager().registerEvents(new QuakeGunListener(this), this);
         getServer().getPluginManager().registerEvents(new WallClimbListener(this), this);
 
@@ -67,5 +65,4 @@ public class MecchaChameleon extends JavaPlugin {
     public GameManager getGameManager() { return gameManager; }
     public LobbyManager getLobbyManager() { return lobbyManager; }
     public ScoreboardManager getScoreboardManager() { return scoreboardManager; }
-    public HiderItemListener getHiderItemListener() { return hiderItemListener; }
 }

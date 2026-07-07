@@ -179,21 +179,13 @@ public class GameManager {
         whistle.setItemMeta(whistleMeta);
         player.getInventory().setItem(1, whistle);
 
-        // Slot 2 - Free-Cam
-        ItemStack freeCam = new ItemStack(Material.YELLOW_CONCRETE);
-        ItemMeta freeCamMeta = freeCam.getItemMeta();
-        freeCamMeta.displayName(Component.text("Free-Cam", NamedTextColor.YELLOW));
-        freeCamMeta.lore(List.of(Component.text("Right-click to toggle free-cam view", NamedTextColor.GRAY)));
-        freeCam.setItemMeta(freeCamMeta);
-        player.getInventory().setItem(2, freeCam);
-
-        // Slot 3 - Lock Position
+        // Slot 2 - Lock Position
         ItemStack lock = new ItemStack(Material.ORANGE_CONCRETE);
         ItemMeta lockMeta = lock.getItemMeta();
         lockMeta.displayName(Component.text("Lock Position", NamedTextColor.GOLD));
         lockMeta.lore(List.of(Component.text("Right-click to freeze in place", NamedTextColor.GRAY)));
         lock.setItemMeta(lockMeta);
-        player.getInventory().setItem(3, lock);
+        player.getInventory().setItem(2, lock);
 
         // Slot 8 - Skin Selection
         ItemStack skinItem = new ItemStack(Material.TOTEM_OF_UNDYING);
@@ -320,6 +312,16 @@ public class GameManager {
         // Give seeker loadout
         giveSeekerLoadout(hider);
 
+        // Teleport to map spawn so they aren't stuck in a hiding spot
+        MapData mapData = configManager.getMap(currentMapId);
+        if (mapData != null) {
+            if (mapData.seekerSpawn != null) {
+                hider.teleport(mapData.seekerSpawn);
+            } else if (!mapData.hiderSpawns.isEmpty()) {
+                hider.teleport(mapData.hiderSpawns.get(0));
+            }
+        }
+
         hider.showTitle(Title.title(
                 Component.text("CAUGHT!", NamedTextColor.RED),
                 Component.text("You are now a Seeker!", NamedTextColor.YELLOW),
@@ -428,9 +430,6 @@ public class GameManager {
     }
 
     public void restorePlayer(Player player) {
-        // Clean up free-cam if active
-        plugin.getHiderItemListener().cleanupFreeCam(player);
-
         restoreScale(player);
         player.getInventory().clear();
         player.getInventory().setArmorContents(null);
