@@ -127,7 +127,7 @@ public class ChameleonCommand implements CommandExecutor, TabCompleter {
     private void handleMapCommand(Player player, String[] args) {
         if (!player.hasPermission("chameleon.admin")) { noPermission(player); return; }
         if (args.length < 2) {
-            player.sendMessage(Component.text("Usage: /chameleon map <create|addhiderspawn|setseekerspawn|addskin|removeskin> ...", NamedTextColor.RED));
+            player.sendMessage(Component.text("Usage: /chameleon map <create|delete|addhiderspawn|setseekerspawn|addskin|removeskin> ...", NamedTextColor.RED));
             return;
         }
 
@@ -140,6 +140,18 @@ public class ChameleonCommand implements CommandExecutor, TabCompleter {
                 String name = args[2].toLowerCase();
                 plugin.getConfigManager().createMap(name);
                 player.sendMessage(Component.text("[Chameleon] Map '" + name + "' created!", NamedTextColor.GREEN));
+            }
+            case "delete" -> {
+                if (args.length < 3) {
+                    player.sendMessage(Component.text("Usage: /chameleon map delete <name>", NamedTextColor.RED));
+                    return;
+                }
+                String delId = args[2].toLowerCase();
+                if (plugin.getConfigManager().deleteMap(delId)) {
+                    player.sendMessage(Component.text("[Chameleon] Map '" + delId + "' deleted!", NamedTextColor.GREEN));
+                } else {
+                    player.sendMessage(Component.text("Map not found.", NamedTextColor.RED));
+                }
             }
             case "addhiderspawn" -> {
                 if (args.length < 3) {
@@ -239,6 +251,7 @@ public class ChameleonCommand implements CommandExecutor, TabCompleter {
         player.sendMessage(Component.text("/chameleon setlobby", NamedTextColor.AQUA));
         player.sendMessage(Component.text("/chameleon sethunterroom", NamedTextColor.AQUA));
         player.sendMessage(Component.text("/chameleon map create <name>", NamedTextColor.AQUA));
+        player.sendMessage(Component.text("/chameleon map delete <name>", NamedTextColor.AQUA));
         player.sendMessage(Component.text("/chameleon map addhiderspawn <map>", NamedTextColor.AQUA));
         player.sendMessage(Component.text("/chameleon map setseekerspawn <map>", NamedTextColor.AQUA));
         player.sendMessage(Component.text("/chameleon map addskin <map> <name> <uuid>", NamedTextColor.AQUA));
@@ -261,13 +274,13 @@ public class ChameleonCommand implements CommandExecutor, TabCompleter {
             completions.addAll(List.of("setlobby", "sethunterroom", "map", "forcestart", "stop", "skins", "removespot"));
         } else if (args.length == 2) {
             if ("map".equalsIgnoreCase(args[0])) {
-                completions.addAll(List.of("create", "addhiderspawn", "setseekerspawn", "addskin", "removeskin"));
+                completions.addAll(List.of("create", "delete", "addhiderspawn", "setseekerspawn", "addskin", "removeskin"));
             } else if ("forcestart".equalsIgnoreCase(args[0]) || "skins".equalsIgnoreCase(args[0])) {
                 completions.addAll(plugin.getConfigManager().getMapIds());
             }
         } else if (args.length == 3 && "map".equalsIgnoreCase(args[0])) {
             String sub = args[1].toLowerCase();
-            if ("addhiderspawn".equals(sub) || "setseekerspawn".equals(sub) || "addskin".equals(sub) || "removeskin".equals(sub)) {
+            if ("delete".equals(sub) || "addhiderspawn".equals(sub) || "setseekerspawn".equals(sub) || "addskin".equals(sub) || "removeskin".equals(sub)) {
                 completions.addAll(plugin.getConfigManager().getMapIds());
             }
         } else if (args.length == 4 && "map".equalsIgnoreCase(args[0]) && "removeskin".equalsIgnoreCase(args[1])) {

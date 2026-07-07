@@ -139,6 +139,15 @@ public class ConfigManager {
         saveMaps();
     }
 
+    public boolean deleteMap(String mapId) {
+        if (!maps.containsKey(mapId)) return false;
+        maps.remove(mapId);
+        ConfigurationSection sec = mapsConfig.getConfigurationSection("maps");
+        if (sec != null) sec.set(mapId, null);
+        saveMaps();
+        return true;
+    }
+
     public void addHiderSpawn(String mapId, Location loc) {
         MapData data = maps.get(mapId);
         if (data == null) return;
