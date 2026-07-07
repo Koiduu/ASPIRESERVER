@@ -23,6 +23,8 @@ import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.Team;
 
 import java.time.Duration;
 import java.util.*;
@@ -88,6 +90,9 @@ public class GameManager {
                 setupHider(p, mapData, i - actualSeekers);
             }
         }
+
+        // Hide nametags for all game participants
+        hideNametags();
 
         // Start scoreboard
         scoreboardManager.startScoreboard(this);
@@ -398,6 +403,7 @@ public class GameManager {
         currentMapId = null;
 
         scoreboardManager.clearAll();
+        restoreNametags();
 
         // Teleport everyone back to lobby
         Location lobby = configManager.getLobbySpawn();
@@ -445,6 +451,29 @@ public class GameManager {
 
         frozenPlayers.remove(player.getUniqueId());
         scoreboardManager.removeScoreboard(player);
+    }
+
+    private void hideNametags() {
+        Scoreboard mainBoard = Bukkit.getScoreboardManager().getMainScoreboard();
+        Team hideTeam = mainBoard.getTeam("cham_hidden");
+        if (hideTeam == null) {
+            hideTeam = mainBoard.registerNewTeam("cham_hidden");
+        }
+        hideTeam.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.NEVER);
+        for (UUID uuid : playerRoles.keySet()) {
+            Player p = Bukkit.getPlayer(uuid);
+            if (p != null) {
+                hideTeam.addPlayer(p);
+            }
+        }
+    }
+
+    private void restoreNametags() {
+        Scoreboard mainBoard = Bukkit.getScoreboardManager().getMainScoreboard();
+        Team hideTeam = mainBoard.getTeam("cham_hidden");
+        if (hideTeam != null) {
+            hideTeam.unregister();
+        }
     }
 
     public void forceStop() {
