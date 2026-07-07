@@ -33,29 +33,39 @@ public class DeathListener implements Listener {
     public void onDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
 
-        // Collect ALL items: main inventory (36) + armor (4) + offhand (1)
+        // Collect items from separate slot groups to avoid double-counting
         List<ItemStack> allItems = new ArrayList<>();
-        for (ItemStack item : player.getInventory().getContents()) {
+        // Main inventory (36 storage slots only — NOT getContents() which includes armor+offhand)
+        for (ItemStack item : player.getInventory().getStorageContents()) {
             if (item != null && item.getType() != Material.AIR) {
-                allItems.add(item);
+                allItems.add(item.clone());
             }
         }
+        // Armor (4 slots)
         for (ItemStack item : player.getInventory().getArmorContents()) {
             if (item != null && item.getType() != Material.AIR) {
-                allItems.add(item);
+                allItems.add(item.clone());
             }
         }
+        // Offhand (1 slot)
         ItemStack offhand = player.getInventory().getItemInOffHand();
-        if (offhand != null && offhand.getType() != Material.AIR) {
-            allItems.add(offhand);
+        if (offhand.getType() != Material.AIR) {
+            allItems.add(offhand.clone());
         }
 
         Graveyard gy = plugin.getGraveyardManager().createGraveyard(
             player.getUniqueId(), player.getLocation(), allItems);
 
         if (gy != null) {
+            // Prevent ALL duplication vectors:
+            // 1. keepInventory=true suppresses vanilla item drops entirely
+            // 2. Clear drops list in case another plugin added to it
+            // 3. Explicitly wipe inventory so items can't persist through respawn
+            event.setKeepInventory(true);
             event.getDrops().clear();
-            event.setKeepInventory(false);
+            player.getInventory().clear();
+            player.getInventory().setArmorContents(new ItemStack[4]);
+            player.getInventory().setItemInOffHand(new ItemStack(Material.AIR));
 
             Location loc = gy.getLocation();
             if (loc != null) {
