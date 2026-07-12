@@ -69,6 +69,16 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
                     msg(sender, ok ? "Removed point " + id : "No point with id " + id, ok ? NamedTextColor.GREEN : NamedTextColor.RED);
                 } catch (NumberFormatException e) { msg(sender, "Invalid id.", NamedTextColor.RED); }
             }
+            case "removebed" -> {
+                if (args.length < 3) { msg(sender, "Usage: /bw sb removebed <team>", NamedTextColor.RED); return; }
+                TeamColor c = TeamColor.fromString(args[2]);
+                if (c == null) { msg(sender, "Unknown team.", NamedTextColor.RED); return; }
+                boolean had = plugin.getSetupConfig().getTeamBeds().containsKey(c);
+                plugin.getSetupConfig().removeTeamBed(c);
+                plugin.getSetupConfig().save();
+                msg(sender, had ? "Removed " + c.displayName() + " bed." : c.displayName() + " had no bed set.",
+                        had ? NamedTextColor.GREEN : NamedTextColor.YELLOW);
+            }
             case "mirror" -> {
                 if (args.length < 4) { msg(sender, "Usage: /bw sb mirror <sourceTeam> <targetTeam>", NamedTextColor.RED); return; }
                 TeamColor src = TeamColor.fromString(args[2]);
@@ -193,7 +203,12 @@ public class BedwarsCommand implements CommandExecutor, TabCompleter {
             return filter(Arrays.asList("join", "stats", "sb", "save", "test", "start", "stop", "reload"), args[0]);
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("sb")) {
-            return filter(Arrays.asList("show", "hide", "list", "remove", "mirror"), args[1]);
+            return filter(Arrays.asList("show", "hide", "list", "remove", "removebed", "mirror"), args[1]);
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("sb") && args[1].equalsIgnoreCase("removebed")) {
+            List<String> teams = new ArrayList<>();
+            for (TeamColor c : TeamColor.values()) teams.add(c.name());
+            return filter(teams, args[2]);
         }
         if (args.length >= 3 && args[0].equalsIgnoreCase("sb") && args[1].equalsIgnoreCase("mirror")) {
             List<String> teams = new ArrayList<>();
