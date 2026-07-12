@@ -43,6 +43,7 @@ public class MecchaChameleon extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new HiderItemListener(this), this);
         getServer().getPluginManager().registerEvents(new QuakeGunListener(this), this);
         getServer().getPluginManager().registerEvents(new WallClimbListener(this), this);
+        getServer().getPluginManager().registerEvents(new DoubleJumpListener(this), this);
 
         // Fetch skins async
         skinCache.fetchAllSkins();

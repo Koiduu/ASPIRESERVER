@@ -2,7 +2,6 @@ package com.aspireserver.chameleon.scoreboard;
 
 import com.aspireserver.chameleon.MecchaChameleon;
 import com.aspireserver.chameleon.game.GameManager;
-import com.aspireserver.chameleon.game.GameState;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -10,8 +9,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.scoreboard.*;
 import org.bukkit.scoreboard.Team;
-
-import java.util.UUID;
 
 public class ScoreboardManager {
 
@@ -35,10 +32,14 @@ public class ScoreboardManager {
     private void setScoreboard(Player player, GameManager gm) {
         Scoreboard board = Bukkit.getScoreboardManager().getNewScoreboard();
         Objective obj = board.registerNewObjective("chameleon", Criteria.DUMMY,
-                Component.text("CHAMELEON", NamedTextColor.GREEN, TextDecoration.BOLD));
+                Component.text()
+                        .append(Component.text("« ", NamedTextColor.DARK_GREEN))
+                        .append(Component.text("CHAMELEON", NamedTextColor.GREEN, TextDecoration.BOLD))
+                        .append(Component.text(" »", NamedTextColor.DARK_GREEN))
+                        .build());
         obj.setDisplaySlot(DisplaySlot.SIDEBAR);
 
-        // Add nametag hiding team to this custom scoreboard
+        // Nametag hiding team
         Team hideTeam = board.registerNewTeam("cham_hidden");
         hideTeam.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.NEVER);
         for (Player p : Bukkit.getOnlinePlayers()) {
@@ -47,47 +48,79 @@ public class ScoreboardManager {
             }
         }
 
-        int line = 8;
+        int line = 10;
 
-        // Map
+        // --- MAP section ---
         String mapName = gm.getCurrentMapId() != null ? gm.getCurrentMapId() : "???";
-        obj.getScore(toEntry("Map: " + mapName)).setScore(line--);
+        setLine(board, obj, line--, Component.text()
+                .append(Component.text("Map ", NamedTextColor.GOLD, TextDecoration.BOLD))
+                .append(Component.text(mapName, NamedTextColor.WHITE))
+                .build());
 
-        // Blank
-        obj.getScore(toEntry(" ")).setScore(line--);
+        setBlank(board, obj, line--);
 
-        // Phase
-        String phase = switch (gm.getState()) {
-            case HIDING -> "HIDING";
-            case HUNTING -> "HUNTING";
-            case REVEAL -> "REVEAL";
-            default -> "???";
-        };
-        obj.getScore(toEntry("Phase: " + phase)).setScore(line--);
+        // --- STATUS section ---
+        NamedTextColor phaseColor;
+        String phase;
+        switch (gm.getState()) {
+            case HIDING -> { phase = "Hiding"; phaseColor = NamedTextColor.AQUA; }
+            case HUNTING -> { phase = "Hunting"; phaseColor = NamedTextColor.RED; }
+            case REVEAL -> { phase = "Reveal"; phaseColor = NamedTextColor.LIGHT_PURPLE; }
+            default -> { phase = "???"; phaseColor = NamedTextColor.GRAY; }
+        }
+        setLine(board, obj, line--, Component.text()
+                .append(Component.text("Phase: ", NamedTextColor.GRAY))
+                .append(Component.text(phase, phaseColor, TextDecoration.BOLD))
+                .build());
 
-        // Time
         int time = gm.getTimeRemaining();
         String timeStr = String.format("%02d:%02d", time / 60, time % 60);
-        obj.getScore(toEntry("Time: " + timeStr)).setScore(line--);
+        NamedTextColor timeColor = time <= 30 ? NamedTextColor.RED : NamedTextColor.YELLOW;
+        setLine(board, obj, line--, Component.text()
+                .append(Component.text("Time: ", NamedTextColor.GRAY))
+                .append(Component.text(timeStr, timeColor))
+                .build());
 
-        // Blank
-        obj.getScore(toEntry("  ")).setScore(line--);
+        setBlank(board, obj, line--);
 
-        // Hiders alive
-        obj.getScore(toEntry("Hiders: " + gm.getHiderCount())).setScore(line--);
+        // --- TEAMS section ---
+        setLine(board, obj, line--, Component.text()
+                .append(Component.text("\u25B6 Hiders: ", NamedTextColor.GREEN, TextDecoration.BOLD))
+                .append(Component.text(String.valueOf(gm.getHiderCount()), NamedTextColor.WHITE))
+                .build());
 
-        // Hunters
-        obj.getScore(toEntry("Hunters: " + gm.getSeekerCount())).setScore(line--);
+        setLine(board, obj, line--, Component.text()
+                .append(Component.text("\u2620 Hunters: ", NamedTextColor.RED, TextDecoration.BOLD))
+                .append(Component.text(String.valueOf(gm.getSeekerCount()), NamedTextColor.WHITE))
+                .build());
 
-        // Blank
-        obj.getScore(toEntry("   ")).setScore(line--);
+        setBlank(board, obj, line--);
+
+        // Footer
+        setLine(board, obj, line--, Component.text("aspire.server", NamedTextColor.DARK_GREEN, TextDecoration.ITALIC));
 
         player.setScoreboard(board);
     }
 
-    private String toEntry(String text) {
-        // Ensure uniqueness by padding with invisible chars if needed
-        return text;
+    // Uses a per-line team so the visible text can be a fully colored Component.
+    // Each entry is a unique invisible string built from color codes.
+    private void setLine(Scoreboard board, Objective obj, int score, Component text) {
+        String entry = invisibleEntry(score);
+        Team team = board.registerNewTeam("line_" + score);
+        team.addEntry(entry);
+        team.prefix(text);
+        obj.getScore(entry).setScore(score);
+    }
+
+    private void setBlank(Scoreboard board, Objective obj, int score) {
+        String entry = invisibleEntry(score);
+        obj.getScore(entry).setScore(score);
+    }
+
+    private String invisibleEntry(int score) {
+        // Unique, invisible per-line identifier using color codes
+        String hex = Integer.toHexString(score & 0xF);
+        return "\u00A7" + hex + "\u00A7r";
     }
 
     public void removeScoreboard(Player player) {

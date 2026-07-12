@@ -26,6 +26,8 @@ public class WallClimbListener implements Listener {
         if (!gm.isParticipant(player.getUniqueId())) return;
         if (gm.isFrozen(player.getUniqueId())) return;
 
+        // Must hold shift (sneak) to climb
+        if (!player.isSneaking()) return;
         if (!isMovingForward(event)) return;
 
         Location eyeLoc = player.getEyeLocation();
@@ -41,11 +43,8 @@ public class WallClimbListener implements Listener {
 
             Vector vel = player.getVelocity();
 
-            if (player.isSneaking()) {
-                // Sneak = hold position on wall
-                vel.setY(0.0);
-            } else if (!abovePlayer.getType().isSolid()) {
-                // Auto-climb: steady upward velocity (like a fast ladder)
+            if (!abovePlayer.getType().isSolid()) {
+                // Climb: steady upward velocity (like a fast ladder)
                 vel.setY(0.25);
             } else {
                 // Ceiling above, hold position

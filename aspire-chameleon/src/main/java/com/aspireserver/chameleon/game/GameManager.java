@@ -434,6 +434,8 @@ public class GameManager {
         player.getInventory().clear();
         player.getInventory().setArmorContents(null);
         player.setGameMode(org.bukkit.GameMode.ADVENTURE);
+        player.setFlying(false);
+        player.setAllowFlight(false);
 
         // Clear camo armor
         plugin.getCamoManager().clearCamo(player);
