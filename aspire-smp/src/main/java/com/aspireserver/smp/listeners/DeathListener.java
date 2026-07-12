@@ -1,25 +1,10 @@
 package com.aspireserver.smp.listeners;
 
 import com.aspireserver.smp.AspireSMP;
-import com.aspireserver.smp.graveyard.Graveyard;
-import com.aspireserver.smp.graveyard.GraveyardManager;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Location;
-import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.Action;
-import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.Material;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 
 public class DeathListener implements Listener {
 
@@ -31,104 +16,8 @@ public class DeathListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onDeath(PlayerDeathEvent event) {
-        Player player = event.getEntity();
-
-        // Collect items from separate slot groups to avoid double-counting
-        List<ItemStack> allItems = new ArrayList<>();
-        // Main inventory (36 storage slots only — NOT getContents() which includes armor+offhand)
-        for (ItemStack item : player.getInventory().getStorageContents()) {
-            if (item != null && item.getType() != Material.AIR) {
-                allItems.add(item.clone());
-            }
-        }
-        // Armor (4 slots)
-        for (ItemStack item : player.getInventory().getArmorContents()) {
-            if (item != null && item.getType() != Material.AIR) {
-                allItems.add(item.clone());
-            }
-        }
-        // Offhand (1 slot)
-        ItemStack offhand = player.getInventory().getItemInOffHand();
-        if (offhand.getType() != Material.AIR) {
-            allItems.add(offhand.clone());
-        }
-
-        Graveyard gy = plugin.getGraveyardManager().createGraveyard(
-            player.getUniqueId(), player.getLocation(), allItems);
-
-        if (gy != null) {
-            // Prevent ALL duplication vectors:
-            // 1. keepInventory=true suppresses vanilla item drops entirely
-            // 2. Clear drops list in case another plugin added to it
-            // 3. Explicitly wipe inventory so items can't persist through respawn
-            event.setKeepInventory(true);
-            event.getDrops().clear();
-            player.getInventory().clear();
-            player.getInventory().setArmorContents(new ItemStack[4]);
-            player.getInventory().setItemInOffHand(new ItemStack(Material.AIR));
-
-            Location loc = gy.getLocation();
-            if (loc != null) {
-                player.sendMessage(Component.text("Your items are in a graveyard at: ", NamedTextColor.GOLD)
-                    .append(Component.text(loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ(), NamedTextColor.YELLOW)));
-            } else {
-                player.sendMessage(Component.text("Your items are stored in a graveyard.", NamedTextColor.GOLD));
-            }
-        }
-    }
-
-    @EventHandler
-    public void onInteract(PlayerInteractEvent event) {
-        if (event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
-        if (event.getClickedBlock() == null) return;
-        if (event.getClickedBlock().getType() != Material.SOUL_LANTERN) return;
-
-        Player player = event.getPlayer();
-        Location blockLoc = event.getClickedBlock().getLocation();
-
-        Graveyard graveyard = plugin.getGraveyardManager().getGraveyardAt(blockLoc, player.getUniqueId());
-        if (graveyard == null) return;
-
-        event.setCancelled(true);
-
-        HashMap<Integer, ItemStack> overflow = player.getInventory().addItem(
-            graveyard.getItems().toArray(new ItemStack[0]));
-
-        if (!overflow.isEmpty()) {
-            for (ItemStack item : overflow.values()) {
-                player.getWorld().dropItemNaturally(player.getLocation(), item);
-            }
-        }
-
-        plugin.getGraveyardManager().removeGraveyard(graveyard);
-        player.sendMessage(Component.text("Items retrieved from graveyard!", NamedTextColor.GREEN));
-    }
-
-    @EventHandler(priority = EventPriority.HIGH)
-    public void onBlockBreak(BlockBreakEvent event) {
-        if (event.getBlock().getType() != Material.SOUL_LANTERN) return;
-
-        Location blockLoc = event.getBlock().getLocation();
-        // Check if this soul lantern is a graveyard
-        for (var entry : getAllGraveyards()) {
-            Location gyLoc = entry.getLocation();
-            if (gyLoc == null) continue;
-            if (gyLoc.getWorld().equals(blockLoc.getWorld())
-                && gyLoc.getBlockX() == blockLoc.getBlockX()
-                && gyLoc.getBlockY() == blockLoc.getBlockY()
-                && gyLoc.getBlockZ() == blockLoc.getBlockZ()) {
-                event.setCancelled(true);
-                event.getPlayer().sendActionBar(Component.text(
-                    "This is a graveyard! Right-click to retrieve items.", NamedTextColor.RED));
-                return;
-            }
-        }
-    }
-
-    private java.util.List<Graveyard> getAllGraveyards() {
-        java.util.List<Graveyard> all = new java.util.ArrayList<>();
-        // Access via GraveyardManager — iterate all graveyards
-        plugin.getGraveyardManager().forEachGraveyard(all::add);
-        return all;
+        // Vanilla behavior: drop all items on death
+        event.setKeepInventory(false);
+        event.setKeepLevel(false);
     }
 }

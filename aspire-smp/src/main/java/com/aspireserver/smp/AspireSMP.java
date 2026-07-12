@@ -8,7 +8,6 @@ import com.aspireserver.smp.commands.TradeCommand;
 import com.aspireserver.smp.commands.TrustCommand;
 import com.aspireserver.smp.commands.SmpWorldCommand;
 import com.aspireserver.smp.commands.UpgradeLandCommand;
-import com.aspireserver.smp.graveyard.GraveyardManager;
 import com.aspireserver.smp.listeners.ClaimListener;
 import com.aspireserver.smp.listeners.CombatLogListener;
 import com.aspireserver.smp.listeners.DeathListener;
@@ -34,7 +33,6 @@ public final class AspireSMP extends JavaPlugin {
 
     private static AspireSMP instance;
     private ClaimManager claimManager;
-    private GraveyardManager graveyardManager;
     private TradeManager tradeManager;
     private TeamManager teamManager;
     private ShopManager shopManager;
@@ -45,7 +43,6 @@ public final class AspireSMP extends JavaPlugin {
         saveDefaultConfig();
 
         claimManager = new ClaimManager(this);
-        graveyardManager = new GraveyardManager(this);
         tradeManager = new TradeManager();
         teamManager = new TeamManager(this);
         shopManager = new ShopManager(this);
@@ -59,7 +56,6 @@ public final class AspireSMP extends JavaPlugin {
     @Override
     public void onDisable() {
         claimManager.saveAllClaims();
-        graveyardManager.saveAll();
         teamManager.saveTeams();
         shopManager.saveListings();
         getLogger().info("[AspireSMP] Plugin disabled.");
@@ -120,7 +116,4 @@ public final class AspireSMP extends JavaPlugin {
         return claimManager;
     }
 
-    public GraveyardManager getGraveyardManager() {
-        return graveyardManager;
-    }
 }

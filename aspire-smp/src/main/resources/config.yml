@@ -15,13 +15,6 @@ tier2:
   cost-material: NETHERITE_INGOT
   limit: 500
 
-# Graveyard settings
-graveyard:
-  # Graveyard expires after X hours (-1 for never)
-  expire-hours: -1
-  # Block used for tombstone
-  tombstone-block: SOUL_LANTERN
-
 # One-player sleep
 one-player-sleep: true
 
