@@ -1,0 +1,32 @@
+# AspireBedwars configuration
+# All gameplay is isolated to this world.
+world-name: bedwars
+
+# Lobby / match sizing
+min-players: 2
+max-teams: 8
+team-size: 1
+lobby-countdown: 20
+
+# Respawn
+respawn-seconds: 5
+respawn-invuln-seconds: 4
+disconnect-grace-seconds: 60
+
+# Combat
+sharpness-cap: 3
+
+# Generator / game timeline (minutes). Cadence defaults to 6/6/6/10/10.
+timeline:
+  diamond-tier2-min: 6      # Diamond/Emerald -> Tier II
+  diamond-tier3-min: 6      # +minutes later -> Tier III (max)
+  bed-destruction-min: 6    # +minutes later -> all beds auto-destroyed
+  sudden-death-min: 10      # +minutes later -> Sudden Death (dragons)
+  game-over-min: 10         # +minutes later -> hard cutoff, declare winner
+
+# Base generator intervals (ticks) at tier 1
+generators:
+  iron-interval-ticks: 15
+  gold-interval-ticks: 70
+  diamond-interval-ticks: 600
+  emerald-interval-ticks: 800
