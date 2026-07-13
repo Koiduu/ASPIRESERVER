@@ -41,6 +41,7 @@ public final class AspireBedwars extends JavaPlugin {
     public void onEnable() {
         saveDefaultConfig();
 
+        com.aspireserver.bedwars.util.Keys.init(this);
         setupConfig = new SetupConfigManager(this);
         setupMode = new SetupModeManager(this);
         teamManager = new TeamManager(this);

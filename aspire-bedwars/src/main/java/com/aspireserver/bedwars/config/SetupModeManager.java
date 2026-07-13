@@ -4,6 +4,7 @@ import com.aspireserver.bedwars.AspireBedwars;
 import com.aspireserver.bedwars.generator.GeneratorType;
 import com.aspireserver.bedwars.team.TeamColor;
 import com.aspireserver.bedwars.util.ItemBuilder;
+import com.aspireserver.bedwars.util.Keys;
 import com.aspireserver.bedwars.util.LocationUtil;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -67,18 +68,26 @@ public class SetupModeManager implements Listener {
         TeamColor team = selectedTeam.get(player.getUniqueId());
         GeneratorType gen = selectedGen.get(player.getUniqueId());
         player.getInventory().setItem(0, new ItemBuilder(team.bed()).name("Bed Placer", NamedTextColor.RED)
-                .loreLine("Right-click a block to set " + team.displayName() + " bed", NamedTextColor.GRAY).build());
+                .loreLine("Right-click a block to set " + team.displayName() + " bed", NamedTextColor.GRAY)
+                .tag(Keys.SETUP_ACTION, "bed").build());
         player.getInventory().setItem(1, new ItemBuilder(Material.ENDER_PEARL).name("Team Spawn Setter", NamedTextColor.GREEN)
-                .loreLine("Right-click to set " + team.displayName() + " spawn at your position", NamedTextColor.GRAY).build());
+                .loreLine("Right-click to set " + team.displayName() + " spawn at your position", NamedTextColor.GRAY)
+                .tag(Keys.SETUP_ACTION, "spawn").build());
         player.getInventory().setItem(2, new ItemBuilder(gen.material()).name("Generator Placer", NamedTextColor.AQUA)
-                .loreLine("Right-click a block to place a " + gen.name() + " generator", NamedTextColor.GRAY).build());
-        player.getInventory().setItem(3, new ItemBuilder(Material.EMERALD).name("Shop NPC Placer", NamedTextColor.GREEN).build());
-        player.getInventory().setItem(4, new ItemBuilder(Material.DIAMOND).name("Upgrade NPC Placer", NamedTextColor.AQUA).build());
-        player.getInventory().setItem(5, new ItemBuilder(Material.BEACON).name("Lobby Spawn Setter", NamedTextColor.YELLOW).build());
+                .loreLine("Right-click a block to place a " + gen.name() + " generator", NamedTextColor.GRAY)
+                .tag(Keys.SETUP_ACTION, "gen_place").tag(Keys.GEN_TYPE, gen.name()).build());
+        player.getInventory().setItem(3, new ItemBuilder(Material.EMERALD).name("Shop NPC Placer", NamedTextColor.GREEN)
+                .tag(Keys.SETUP_ACTION, "npc_shop").build());
+        player.getInventory().setItem(4, new ItemBuilder(Material.DIAMOND).name("Upgrade NPC Placer", NamedTextColor.AQUA)
+                .tag(Keys.SETUP_ACTION, "npc_upgrade").build());
+        player.getInventory().setItem(5, new ItemBuilder(Material.BEACON).name("Lobby Spawn Setter", NamedTextColor.YELLOW)
+                .tag(Keys.SETUP_ACTION, "lobby").build());
         player.getInventory().setItem(7, new ItemBuilder(team.wool()).name("Selected Team: " + team.displayName(), team.textColor())
-                .loreLine("Right-click to cycle team", NamedTextColor.GRAY).build());
+                .loreLine("Right-click to cycle team", NamedTextColor.GRAY)
+                .tag(Keys.SETUP_ACTION, "team_cycle").build());
         player.getInventory().setItem(8, new ItemBuilder(gen.material()).name("Gen Type: " + gen.name(), NamedTextColor.AQUA)
-                .loreLine("Right-click to cycle generator type", NamedTextColor.GRAY).build());
+                .loreLine("Right-click to cycle generator type", NamedTextColor.GRAY)
+                .tag(Keys.SETUP_ACTION, "gen_cycle").tag(Keys.GEN_TYPE, gen.name()).build());
     }
 
     @EventHandler
@@ -88,60 +97,57 @@ public class SetupModeManager implements Listener {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK && event.getAction() != Action.RIGHT_CLICK_AIR) return;
         ItemStack hand = event.getItem();
         if (hand == null) return;
+        String action = Keys.read(hand, Keys.SETUP_ACTION);
+        if (action == null) return;
         event.setCancelled(true);
 
         Location blockLoc = event.getClickedBlock() != null ? event.getClickedBlock().getLocation() : player.getLocation();
         TeamColor team = selectedTeam.get(player.getUniqueId());
         GeneratorType gen = selectedGen.get(player.getUniqueId());
 
-        switch (hand.getType()) {
-            case ENDER_PEARL -> {
+        switch (action) {
+            case "spawn" -> {
                 plugin.getSetupConfig().setTeamSpawn(team, player.getLocation());
                 plugin.getSetupConfig().save();
                 msg(player, team.displayName() + " spawn set.");
             }
-            case EMERALD -> {
-                if (hand.getItemMeta() != null && named(hand, "Shop NPC Placer")) {
-                    plugin.getSetupConfig().addNpc(new NpcPoint(NpcPoint.NpcType.SHOP, player.getLocation()));
-                    plugin.getSetupConfig().save();
-                    msg(player, "Shop NPC placed.");
-                }
+            case "npc_shop" -> {
+                plugin.getSetupConfig().addNpc(new NpcPoint(NpcPoint.NpcType.SHOP, player.getLocation()));
+                plugin.getSetupConfig().save();
+                msg(player, "Shop NPC placed.");
             }
-            case DIAMOND -> {
+            case "npc_upgrade" -> {
                 plugin.getSetupConfig().addNpc(new NpcPoint(NpcPoint.NpcType.UPGRADE, player.getLocation()));
                 plugin.getSetupConfig().save();
                 msg(player, "Upgrade NPC placed.");
             }
-            case BEACON -> {
+            case "lobby" -> {
                 plugin.getSetupConfig().setLobbySpawn(player.getLocation());
                 plugin.getSetupConfig().save();
                 msg(player, "Lobby spawn set.");
             }
-            default -> {
-                if (named(hand, "Bed Placer")) {
-                    plugin.getSetupConfig().setTeamBed(team, blockLoc);
-                    plugin.getSetupConfig().save();
-                    msg(player, team.displayName() + " bed set at " + coords(blockLoc));
-                } else if (named(hand, "Generator Placer")) {
-                    TeamColor genTeam = gen.isTeamGenerator() ? team : null;
-                    plugin.getSetupConfig().addGenerator(new GeneratorPoint(gen, blockLoc, genTeam));
-                    plugin.getSetupConfig().save();
-                    msg(player, gen.name() + " generator placed" + (genTeam != null ? " (" + genTeam.displayName() + ")" : "") + ".");
-                } else if (named(hand, "Selected Team")) {
-                    cycleTeam(player);
-                } else if (named(hand, "Gen Type")) {
-                    cycleGen(player);
-                }
+            case "bed" -> {
+                plugin.getSetupConfig().setTeamBed(team, blockLoc);
+                plugin.getSetupConfig().save();
+                msg(player, team.displayName() + " bed set at " + coords(blockLoc));
             }
+            case "gen_place" -> {
+                GeneratorType placeType = readGenType(hand, gen);
+                TeamColor genTeam = placeType.isTeamGenerator() ? team : null;
+                plugin.getSetupConfig().addGenerator(new GeneratorPoint(placeType, blockLoc, genTeam));
+                plugin.getSetupConfig().save();
+                msg(player, placeType.name() + " generator placed" + (genTeam != null ? " (" + genTeam.displayName() + ")" : "") + ".");
+            }
+            case "team_cycle" -> cycleTeam(player);
+            case "gen_cycle" -> cycleGen(player);
+            default -> {}
         }
         if (markersShown) refreshMarkers();
     }
 
-    private boolean named(ItemStack item, String contains) {
-        if (item.getItemMeta() == null || item.getItemMeta().displayName() == null) return false;
-        String name = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
-                .serialize(item.getItemMeta().displayName());
-        return name.contains(contains);
+    private GeneratorType readGenType(ItemStack hand, GeneratorType fallback) {
+        GeneratorType t = GeneratorType.fromString(Keys.read(hand, Keys.GEN_TYPE));
+        return t != null ? t : fallback;
     }
 
     private void cycleTeam(Player player) {

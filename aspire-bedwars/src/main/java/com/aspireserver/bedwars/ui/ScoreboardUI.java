@@ -15,12 +15,18 @@ import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.UUID;
 
 public class ScoreboardUI {
 
     private final AspireBedwars plugin;
     private BukkitTask task;
+    // Per-player scoreboard, reused across ticks so we never re-assign a fresh board
+    // (re-assigning interrupts client item use, e.g. shield blocking).
+    private final Map<UUID, Scoreboard> boards = new HashMap<>();
 
     public ScoreboardUI(AspireBedwars plugin) {
         this.plugin = plugin;
@@ -38,6 +44,7 @@ public class ScoreboardUI {
                 p.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
             }
         }
+        boards.clear();
     }
 
     private void updateAll() {
@@ -47,10 +54,23 @@ public class ScoreboardUI {
     }
 
     private void render(Player player) {
-        Scoreboard board = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective obj = board.registerNewObjective("bw", Criteria.DUMMY,
-                Component.text("BED WARS", NamedTextColor.YELLOW, TextDecoration.BOLD));
-        obj.setDisplaySlot(DisplaySlot.SIDEBAR);
+        UUID pid = player.getUniqueId();
+        Scoreboard board = boards.get(pid);
+        boolean assign = false;
+        if (board == null || player.getScoreboard() != board) {
+            board = Bukkit.getScoreboardManager().getNewScoreboard();
+            boards.put(pid, board);
+            assign = true;
+        }
+        Objective obj = board.getObjective("bw");
+        if (obj == null) {
+            obj = board.registerNewObjective("bw", Criteria.DUMMY,
+                    Component.text("BED WARS", NamedTextColor.YELLOW, TextDecoration.BOLD));
+            obj.setDisplaySlot(DisplaySlot.SIDEBAR);
+        }
+        // Clear previous lines in place (keeps the same board object).
+        for (String entry : new HashSet<>(board.getEntries())) board.resetScores(entry);
+        for (Team t : new HashSet<>(board.getTeams())) t.unregister();
 
         int line = 15;
         setLine(board, obj, line--, Component.text(timeString(), NamedTextColor.GRAY));
@@ -83,7 +103,7 @@ public class ScoreboardUI {
                 .append(Component.text(fk, NamedTextColor.WHITE)));
         setLine(board, obj, line--, Component.text("aspire.server", NamedTextColor.YELLOW));
 
-        player.setScoreboard(board);
+        if (assign) player.setScoreboard(board);
     }
 
     private String timeString() {

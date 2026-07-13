@@ -101,7 +101,8 @@ public class InteractionListener implements Listener {
                 ShopCategory cat = plugin.getShopManager().categoryFromTab(clicked.getType());
                 if (cat != null) { plugin.getShopManager().openShop(player, cat); return; }
             }
-            ShopItem item = plugin.getShopManager().findByIcon(clicked, sh.category);
+            ShopItem item = plugin.getShopManager().findById(clicked);
+            if (item == null) item = plugin.getShopManager().findByIcon(clicked, sh.category);
             if (item != null) plugin.getShopManager().purchase(player, item);
         } else if (holder instanceof ShopManager.UpgradeHolder) {
             plugin.getShopManager().handleUpgradeClick(player, clicked.getType());

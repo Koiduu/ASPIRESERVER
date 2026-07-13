@@ -1,14 +1,19 @@
 package com.aspireserver.bedwars.arena;
 
 import com.aspireserver.bedwars.AspireBedwars;
+import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
+import org.bukkit.block.Container;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.TNTPrimed;
+import org.bukkit.inventory.ItemStack;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,6 +30,8 @@ public class ArenaResetManager {
     private final Map<String, Location> placed = new ConcurrentHashMap<>();
     // key -> original BlockData of a block BROKEN during the match (restore on reset)
     private final Map<String, BlockData> broken = new LinkedHashMap<>();
+    // key -> snapshot of a chest/container's contents at match start (restore on reset)
+    private final Map<String, ItemStack[]> chestSnapshots = new HashMap<>();
 
     public ArenaResetManager(AspireBedwars plugin) {
         this.plugin = plugin;
@@ -58,9 +65,45 @@ public class ArenaResetManager {
     public void beginMatch() {
         placed.clear();
         broken.clear();
+        chestSnapshots.clear();
+        snapshotChests();
+    }
+
+    /** Captures the contents of every loaded chest/container in the bedwars world. */
+    private void snapshotChests() {
+        World world = plugin.getServer().getWorld(plugin.getSetupConfig().getWorldName());
+        if (world == null) return;
+        for (Chunk chunk : world.getLoadedChunks()) {
+            for (BlockState state : chunk.getTileEntities()) {
+                if (state instanceof Container container) {
+                    chestSnapshots.put(key(container.getLocation()), cloneContents(container.getInventory().getContents()));
+                }
+            }
+        }
+    }
+
+    private static ItemStack[] cloneContents(ItemStack[] src) {
+        ItemStack[] out = new ItemStack[src.length];
+        for (int i = 0; i < src.length; i++) out[i] = src[i] == null ? null : src[i].clone();
+        return out;
     }
 
     public void resetArena() {
+        // Reset chests: clear any chest that isn't part of the pre-match snapshot,
+        // restore snapshotted chests to their original contents.
+        World bwWorld = plugin.getServer().getWorld(plugin.getSetupConfig().getWorldName());
+        if (bwWorld != null) {
+            for (Chunk chunk : bwWorld.getLoadedChunks()) {
+                for (BlockState state : chunk.getTileEntities()) {
+                    if (!(state instanceof Container container)) continue;
+                    ItemStack[] snap = chestSnapshots.get(key(container.getLocation()));
+                    container.getInventory().clear();
+                    if (snap != null) container.getInventory().setContents(cloneContents(snap));
+                }
+            }
+        }
+        chestSnapshots.clear();
+
         // Remove player-placed blocks
         for (Location loc : placed.values()) {
             Block b = loc.getBlock();

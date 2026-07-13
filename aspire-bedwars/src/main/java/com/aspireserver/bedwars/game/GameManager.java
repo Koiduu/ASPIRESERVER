@@ -33,6 +33,12 @@ public class GameManager {
     private final Map<UUID, Long> disconnectDeadline = new HashMap<>();
     private final Map<UUID, BukkitTask> respawnTasks = new HashMap<>();
     private final Set<UUID> invulnerable = new HashSet<>();
+    // Players whose death is currently being processed — blocks re-entrant death handling
+    // (e.g. repeated VOID damage ticks while falling below the world).
+    private final Set<UUID> pendingDeath = new HashSet<>();
+    // Ender chest contents captured at match start, restored on reset so bedwars
+    // never leaks into a player's global (e.g. SMP) ender chest.
+    private final Map<UUID, ItemStack[]> enderSnapshots = new HashMap<>();
 
     private BukkitTask countdownTask;
     private BukkitTask fieldTask;
@@ -49,6 +55,7 @@ public class GameManager {
 
     public PlayerData getPlayerData(UUID uuid) { return playerData.get(uuid); }
     public boolean isInvulnerable(UUID uuid) { return invulnerable.contains(uuid); }
+    public boolean isPendingDeath(UUID uuid) { return pendingDeath.contains(uuid); }
     public Set<UUID> getLobbyPlayers() { return lobbyPlayers; }
 
     public boolean isInBedwarsWorld(Player player) {
@@ -159,7 +166,11 @@ public class GameManager {
         }
 
         plugin.getChatManager().setGameRunning(true);
+        enderSnapshots.clear();
         for (Player p : players) {
+            // Snapshot the global ender chest so bedwars usage is reverted on reset.
+            enderSnapshots.put(p.getUniqueId(), cloneContents(p.getEnderChest().getContents()));
+            p.getEnderChest().clear();
             PlayerData data = new PlayerData(p.getUniqueId());
             playerData.put(p.getUniqueId(), data);
             plugin.getStatsManager().ensurePlayer(p.getUniqueId(), p.getName());
@@ -188,6 +199,14 @@ public class GameManager {
                 if (plugin.getSpectatorManager().isSpectator(p.getUniqueId())) continue;
                 BedwarsTeam own = plugin.getTeamManager().getTeam(p.getUniqueId());
                 if (own == null) continue;
+
+                // Void fallback: on 1.8/ViaVersion clients the VOID damage event can be
+                // unreliable. If a live participant is below the world floor, kill them once.
+                if (p.getLocation().getY() < p.getWorld().getMinHeight() - 2
+                        && !pendingDeath.contains(p.getUniqueId())) {
+                    handleDeath(p, null);
+                    continue;
+                }
 
                 // Heal pool near own bed
                 if (own.hasHealPool() && own.getBed() != null && own.getBed().getWorld() != null
@@ -272,6 +291,7 @@ public class GameManager {
     public void spawnPlayer(Player player, boolean fresh) {
         BedwarsTeam team = plugin.getTeamManager().getTeam(player.getUniqueId());
         if (team == null) return;
+        pendingDeath.remove(player.getUniqueId());
         Location spawn = team.getSpawn();
         if (spawn != null) player.teleport(spawn);
         player.setGameMode(GameMode.SURVIVAL);
@@ -294,7 +314,11 @@ public class GameManager {
 
     private void giveBaseInventory(Player player) {
         player.getInventory().clear();
-        player.getInventory().addItem(new ItemBuilder(Material.WOODEN_SWORD).unbreakable().build());
+        for (com.aspireserver.bedwars.config.LoadoutItem item : plugin.getSetupConfig().getLoadout()) {
+            ItemBuilder b = new ItemBuilder(item.material, item.amount);
+            if (item.unbreakable) b.unbreakable();
+            player.getInventory().addItem(b.build());
+        }
     }
 
     public void applyArmor(Player player) {
@@ -398,7 +422,14 @@ public class GameManager {
     public void handleDeath(Player player, Player killer) {
         BedwarsTeam team = plugin.getTeamManager().getTeam(player.getUniqueId());
         if (team == null) return;
+        // Guard against re-entrant death handling (void damage fires every tick).
+        if (!pendingDeath.add(player.getUniqueId())) return;
         PlayerData data = playerData.get(player.getUniqueId());
+
+        // Immediately lift the player out of any void so they stop falling / glitching.
+        player.setFallDistance(0f);
+        Location safe = team.getSpawn() != null ? team.getSpawn() : plugin.getSetupConfig().getLobbySpawn();
+        if (safe != null) player.teleport(safe);
 
         boolean finalDeath = !team.isBedAlive();
 
@@ -416,6 +447,7 @@ public class GameManager {
             team.eliminate(player.getUniqueId());
             plugin.getStatsManager().increment(player.getUniqueId(), "losses", 0);
             plugin.getSpectatorManager().makeSpectator(player);
+            pendingDeath.remove(player.getUniqueId());
             checkWin();
         } else {
             broadcast(deathMessage(player, killer, false));
@@ -581,15 +613,23 @@ public class GameManager {
             if (p != null && isInBedwarsWorld(p)) {
                 p.setGameMode(GameMode.ADVENTURE);
                 p.getInventory().clear();
+                restoreEnderChest(p);
                 for (PotionEffect e : p.getActivePotionEffects()) p.removePotionEffect(e.getType());
                 Location lobby = plugin.getSetupConfig().getLobbySpawn();
                 if (lobby != null) p.teleport(lobby);
                 giveLobbyItems(p);
             }
         }
+        // Restore ender chests for any snapshotted player who is now offline/elsewhere.
+        for (UUID uuid : new HashSet<>(enderSnapshots.keySet())) {
+            Player p = Bukkit.getPlayer(uuid);
+            if (p != null) restoreEnderChest(p);
+        }
+        enderSnapshots.clear();
 
         playerData.clear();
         invulnerable.clear();
+        pendingDeath.clear();
         disconnectDeadline.clear();
         for (BedwarsTeam t : plugin.getTeamManager().getTeams()) t.reset();
         plugin.getTeamManager().clear();
@@ -601,6 +641,18 @@ public class GameManager {
             return p == null || !isInBedwarsWorld(p);
         });
         if (lobbyPlayers.size() >= plugin.getSetupConfig().getMinPlayers()) startCountdown();
+    }
+
+    private static ItemStack[] cloneContents(ItemStack[] src) {
+        ItemStack[] out = new ItemStack[src.length];
+        for (int i = 0; i < src.length; i++) out[i] = src[i] == null ? null : src[i].clone();
+        return out;
+    }
+
+    private void restoreEnderChest(Player p) {
+        ItemStack[] snapshot = enderSnapshots.remove(p.getUniqueId());
+        p.getEnderChest().clear();
+        if (snapshot != null) p.getEnderChest().setContents(cloneContents(snapshot));
     }
 
     // ---------------- Disconnect / reconnect ----------------

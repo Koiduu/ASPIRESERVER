@@ -68,6 +68,12 @@ public class CombatListener implements Listener {
                 || event.getFinalDamage() >= victim.getHealth();
         if (!lethal) return;
 
+        // Death already being processed (e.g. repeated void ticks) — swallow duplicates.
+        if (plugin.getGameManager().isPendingDeath(victim.getUniqueId())) {
+            event.setCancelled(true);
+            return;
+        }
+
         event.setCancelled(true);
         victim.setHealth(victim.getAttribute(Attribute.MAX_HEALTH).getValue());
         victim.setFireTicks(0);

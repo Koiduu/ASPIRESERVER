@@ -29,17 +29,20 @@ public class BlockListener implements Listener {
         return block.getWorld().getName().equalsIgnoreCase(plugin.getSetupConfig().getWorldName());
     }
 
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlace(BlockPlaceEvent event) {
         Block block = event.getBlock();
         if (!inWorld(block)) return;
         if (plugin.getSetupMode().isInSetup(event.getPlayer())) return;
+        // Only restrict placement before the match; once RUNNING, building is allowed.
         if (!plugin.getGameManager().isRunning()) { event.setCancelled(true); return; }
         if (plugin.getSpectatorManager().isSpectator(event.getPlayer().getUniqueId())) { event.setCancelled(true); return; }
+        // Un-cancel any earlier veto (e.g. server spawn-protection) — participants may build.
+        event.setCancelled(false);
         plugin.getArenaReset().recordPlace(block);
     }
 
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onBreak(BlockBreakEvent event) {
         Block block = event.getBlock();
         if (!inWorld(block)) return;
@@ -72,6 +75,8 @@ public class BlockListener implements Listener {
             player.sendActionBar(Component.text("You can only break player-placed blocks!", NamedTextColor.RED));
             return;
         }
+        // Un-cancel any earlier veto (e.g. server spawn-protection) for a valid break.
+        event.setCancelled(false);
         plugin.getArenaReset().recordBreak(block);
     }
 

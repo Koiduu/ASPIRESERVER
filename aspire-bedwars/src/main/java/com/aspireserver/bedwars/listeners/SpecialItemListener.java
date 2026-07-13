@@ -40,10 +40,11 @@ public class SpecialItemListener implements Listener {
         if (!active(player)) return;
 
         event.setCancelled(true);
-        Fireball fireball = player.launchProjectile(Fireball.class, player.getLocation().getDirection().multiply(1.5));
+        Fireball fireball = player.launchProjectile(Fireball.class, player.getEyeLocation().getDirection().multiply(1.5));
         fireball.setYield(2.0f);
         fireball.setIsIncendiary(false);
         fireball.setShooter(player);
+        player.getWorld().playSound(player.getLocation(), org.bukkit.Sound.ITEM_FIRECHARGE_USE, 1f, 1f);
 
         hand.setAmount(hand.getAmount() - 1);
     }

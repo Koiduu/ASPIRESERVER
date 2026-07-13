@@ -4,6 +4,7 @@ import com.aspireserver.bedwars.AspireBedwars;
 import com.aspireserver.bedwars.game.PlayerData;
 import com.aspireserver.bedwars.team.BedwarsTeam;
 import com.aspireserver.bedwars.util.ItemBuilder;
+import com.aspireserver.bedwars.util.Keys;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -42,7 +43,6 @@ public class ShopManager {
 
         // MELEE
         catalog.add(ShopItem.give("stick_kb", ShopCategory.MELEE, "Knockback Stick", Material.STICK, 1, Material.GOLD_INGOT, 5));
-        catalog.add(ShopItem.give("wood_sword", ShopCategory.MELEE, "Wooden Sword", Material.WOODEN_SWORD, 1, Material.IRON_INGOT, 10));
         catalog.add(ShopItem.give("stone_sword", ShopCategory.MELEE, "Stone Sword", Material.STONE_SWORD, 1, Material.IRON_INGOT, 20));
         catalog.add(ShopItem.give("iron_sword", ShopCategory.MELEE, "Iron Sword", Material.IRON_SWORD, 1, Material.GOLD_INGOT, 7));
         catalog.add(ShopItem.give("diamond_sword", ShopCategory.MELEE, "Diamond Sword", Material.DIAMOND_SWORD, 1, Material.EMERALD, 4));
@@ -78,6 +78,55 @@ public class ShopManager {
 
         // Default quick buy favorites
         quickBuyIds.addAll(List.of("wool", "stone_sword", "arrow", "golden_apple", "tnt", "fireball", "armor_iron", "pickaxe"));
+
+        applyCustomProfile();
+    }
+
+    /**
+     * Applies an optional config-driven shop profile: {@code shop.custom-items} adds
+     * plain "give" entries (or overrides existing ids), and {@code shop.quick-buy}
+     * replaces the default Quick Buy id list. Absent config leaves defaults intact.
+     */
+    private void applyCustomProfile() {
+        var config = plugin.getConfig();
+        for (Map<?, ?> entry : config.getMapList("shop.custom-items")) {
+            String id = strOf(entry.get("id"));
+            if (id == null) continue;
+            ShopCategory category = parseCategory(strOf(entry.get("category")));
+            Material icon = parseMaterial(strOf(entry.get("icon")));
+            Material cost = parseMaterial(strOf(entry.get("cost-material")));
+            if (category == null || icon == null || cost == null) {
+                plugin.getLogger().warning("Skipping custom shop item '" + id + "' (bad category/icon/cost-material).");
+                continue;
+            }
+            String name = entry.get("name") != null ? strOf(entry.get("name")) : id;
+            int amount = entry.get("amount") instanceof Number n ? n.intValue() : 1;
+            int costAmount = entry.get("cost-amount") instanceof Number n ? n.intValue() : 1;
+            catalog.removeIf(i -> i.id.equals(id));
+            catalog.add(ShopItem.give(id, category, name, icon, amount, cost, costAmount));
+        }
+
+        List<String> customQuickBuy = config.getStringList("shop.quick-buy");
+        if (!customQuickBuy.isEmpty()) {
+            quickBuyIds.clear();
+            for (String id : customQuickBuy) {
+                boolean known = catalog.stream().anyMatch(i -> i.id.equals(id));
+                if (known) quickBuyIds.add(id);
+                else plugin.getLogger().warning("Quick-buy id '" + id + "' has no matching shop item.");
+            }
+        }
+    }
+
+    private static String strOf(Object o) { return o == null ? null : String.valueOf(o); }
+
+    private Material parseMaterial(String s) {
+        return s == null ? null : Material.matchMaterial(s);
+    }
+
+    private ShopCategory parseCategory(String s) {
+        if (s == null) return null;
+        for (ShopCategory c : ShopCategory.values()) if (c.name().equalsIgnoreCase(s)) return c;
+        return null;
     }
 
     // ---- GUI holders so the click listener can identify our inventories ----
@@ -176,7 +225,16 @@ public class ShopManager {
                 .name(item.name, canAfford ? NamedTextColor.GREEN : NamedTextColor.RED)
                 .loreLine("Cost: " + item.costAmount + " " + prettyMat(item.costMaterial), costColor)
                 .loreLine(canAfford ? "Click to buy" : "Not enough resources", canAfford ? NamedTextColor.YELLOW : NamedTextColor.RED)
+                .tag(Keys.SHOP_ID, item.id)
                 .build();
+    }
+
+    /** Look up a catalog entry by the stable PDC id stored on a rendered shop icon. */
+    public ShopItem findById(ItemStack clicked) {
+        String id = Keys.read(clicked, Keys.SHOP_ID);
+        if (id == null) return null;
+        for (ShopItem i : catalog) if (i.id.equals(id)) return i;
+        return null;
     }
 
     private String prettyMat(Material m) {
@@ -223,7 +281,7 @@ public class ShopManager {
             case "wool" -> {
                 BedwarsTeam team = plugin.getTeamManager().getTeam(player.getUniqueId());
                 Material wool = team != null ? team.getColor().wool() : Material.WHITE_WOOL;
-                give(player, new ItemStack(wool, item.giveAmount));
+                give(player, new ItemStack(wool, item.iconAmount));
             }
             case "armor_chain" -> { if (data != null) { data.armorTier = Math.max(data.armorTier, 1); plugin.getGameManager().applyArmor(player); } }
             case "armor_iron" -> { if (data != null) { data.armorTier = Math.max(data.armorTier, 2); plugin.getGameManager().applyArmor(player); } }
