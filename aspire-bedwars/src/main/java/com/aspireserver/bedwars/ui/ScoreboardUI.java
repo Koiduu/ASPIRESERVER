@@ -101,7 +101,7 @@ public class ScoreboardUI {
                 .append(Component.text(kills, NamedTextColor.WHITE)));
         setLine(board, obj, line--, Component.text("Final Kills: ", NamedTextColor.GRAY)
                 .append(Component.text(fk, NamedTextColor.WHITE)));
-        setLine(board, obj, line--, Component.text("aspire.server", NamedTextColor.YELLOW));
+        setLine(board, obj, line--, Component.text("play.aspir3.net", NamedTextColor.YELLOW));
 
         if (assign) player.setScoreboard(board);
     }

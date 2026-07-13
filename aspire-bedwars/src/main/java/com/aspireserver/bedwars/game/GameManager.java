@@ -13,6 +13,10 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.type.Bed;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -39,6 +43,8 @@ public class GameManager {
     // Ender chest contents captured at match start, restored on reset so bedwars
     // never leaks into a player's global (e.g. SMP) ender chest.
     private final Map<UUID, ItemStack[]> enderSnapshots = new HashMap<>();
+    // Blocks overwritten by auto-placed beds, restored on reset.
+    private final Map<Location, BlockData> bedBlockOriginals = new HashMap<>();
 
     private BukkitTask countdownTask;
     private BukkitTask fieldTask;
@@ -164,6 +170,7 @@ public class GameManager {
             team.setBed(plugin.getSetupConfig().getTeamBeds().get(team.getColor()));
             team.setBedAlive(team.getBed() != null);
         }
+        placeBeds();
 
         plugin.getChatManager().setGameRunning(true);
         enderSnapshots.clear();
@@ -310,6 +317,55 @@ public class GameManager {
         invulnerable.add(player.getUniqueId());
         int invulnTicks = plugin.getSetupConfig().getRespawnInvulnSeconds() * 20;
         plugin.getServer().getScheduler().runTaskLater(plugin, () -> invulnerable.remove(player.getUniqueId()), invulnTicks);
+    }
+
+    /**
+     * Physically places a team-colored bed at each configured bed location so beds
+     * are always visible in-game, regardless of whether the map was pre-built.
+     * The head faces toward the team spawn when known. Overwritten blocks are
+     * captured so they can be restored on reset.
+     */
+    private void placeBeds() {
+        bedBlockOriginals.clear();
+        for (BedwarsTeam team : plugin.getTeamManager().getTeams()) {
+            Location bedLoc = team.getBed();
+            if (bedLoc == null || bedLoc.getWorld() == null) continue;
+            Block foot = bedLoc.getBlock();
+            BlockFace facing = bedFacing(bedLoc, team.getSpawn());
+            Block head = foot.getRelative(facing);
+
+            bedBlockOriginals.put(foot.getLocation().clone(), foot.getBlockData().clone());
+            bedBlockOriginals.put(head.getLocation().clone(), head.getBlockData().clone());
+
+            Bed footData = (Bed) team.getColor().bed().createBlockData();
+            footData.setPart(Bed.Part.FOOT);
+            footData.setFacing(facing);
+            Bed headData = (Bed) team.getColor().bed().createBlockData();
+            headData.setPart(Bed.Part.HEAD);
+            headData.setFacing(facing);
+
+            foot.setBlockData(footData, false);
+            head.setBlockData(headData, false);
+        }
+    }
+
+    private BlockFace bedFacing(Location bed, Location spawn) {
+        if (spawn == null || spawn.getWorld() == null || !spawn.getWorld().equals(bed.getWorld())) {
+            return BlockFace.NORTH;
+        }
+        double dx = spawn.getX() - bed.getX();
+        double dz = spawn.getZ() - bed.getZ();
+        if (Math.abs(dx) >= Math.abs(dz)) return dx >= 0 ? BlockFace.EAST : BlockFace.WEST;
+        return dz >= 0 ? BlockFace.SOUTH : BlockFace.NORTH;
+    }
+
+    private void restoreBeds() {
+        for (Map.Entry<Location, BlockData> e : bedBlockOriginals.entrySet()) {
+            Location loc = e.getKey();
+            if (loc.getWorld() == null) continue;
+            loc.getBlock().setBlockData(e.getValue(), false);
+        }
+        bedBlockOriginals.clear();
     }
 
     private void giveBaseInventory(Player player) {
@@ -603,6 +659,7 @@ public class GameManager {
         plugin.getNpcManager().despawnAll();
         plugin.getScoreboardUI().stop();
         plugin.getDragonManager().clear();
+        restoreBeds();
         plugin.getArenaReset().resetArena();
         plugin.getSpectatorManager().clearAll();
         plugin.getChatManager().clear();

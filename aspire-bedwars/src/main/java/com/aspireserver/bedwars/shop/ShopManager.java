@@ -288,6 +288,9 @@ public class ShopManager {
             case "armor_diamond" -> { if (data != null) { data.armorTier = Math.max(data.armorTier, 3); plugin.getGameManager().applyArmor(player); } }
             case "pickaxe" -> { if (data != null) { data.pickaxeTier = Math.min(4, data.pickaxeTier + 1); plugin.getGameManager().applyTools(player); } }
             case "axe" -> { if (data != null) { data.axeTier = Math.min(4, data.axeTier + 1); plugin.getGameManager().applyTools(player); } }
+            case "stone_sword" -> giveSword(player, Material.STONE_SWORD);
+            case "iron_sword" -> giveSword(player, Material.IRON_SWORD);
+            case "diamond_sword" -> giveSword(player, Material.DIAMOND_SWORD);
             case "shears" -> { if (data != null) { data.shears = true; plugin.getGameManager().applyTools(player); } }
             case "bow_power" -> give(player, new ItemBuilder(Material.BOW).name("Bow", NamedTextColor.WHITE).enchant(org.bukkit.enchantments.Enchantment.POWER, 1).build());
             case "bow_punch" -> give(player, new ItemBuilder(Material.BOW).name("Bow", NamedTextColor.WHITE).enchant(org.bukkit.enchantments.Enchantment.POWER, 1).enchant(org.bukkit.enchantments.Enchantment.PUNCH, 1).build());
@@ -317,6 +320,33 @@ public class ShopManager {
     private void give(Player player, ItemStack stack) {
         Map<Integer, ItemStack> overflow = player.getInventory().addItem(stack);
         for (ItemStack o : overflow.values()) player.getWorld().dropItemNaturally(player.getLocation(), o);
+    }
+
+    /** Replaces any existing sword (including the wooden default) in-place with the new one. */
+    private void giveSword(Player player, Material swordMat) {
+        BedwarsTeam team = plugin.getTeamManager().getTeam(player.getUniqueId());
+        int sharp = team != null ? team.getSharpnessLevel() : 0;
+        ItemBuilder b = new ItemBuilder(swordMat).unbreakable();
+        if (sharp > 0) b.enchant(org.bukkit.enchantments.Enchantment.SHARPNESS, sharp);
+        ItemStack sword = b.build();
+
+        var inv = player.getInventory();
+        int targetSlot = -1;
+        for (int i = 0; i < inv.getSize(); i++) {
+            ItemStack it = inv.getItem(i);
+            if (it != null && isSword(it.getType())) {
+                if (targetSlot == -1) targetSlot = i;
+                inv.setItem(i, null);
+            }
+        }
+        if (targetSlot == -1) targetSlot = inv.firstEmpty();
+        if (targetSlot >= 0) inv.setItem(targetSlot, sword);
+        else give(player, sword);
+    }
+
+    private boolean isSword(Material m) {
+        return m == Material.WOODEN_SWORD || m == Material.STONE_SWORD || m == Material.IRON_SWORD
+                || m == Material.GOLDEN_SWORD || m == Material.DIAMOND_SWORD || m == Material.NETHERITE_SWORD;
     }
 
     private void fail(Player player, String msg) {

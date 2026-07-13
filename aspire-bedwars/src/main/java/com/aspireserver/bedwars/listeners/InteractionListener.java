@@ -45,6 +45,49 @@ public class InteractionListener implements Listener {
     }
 
     @EventHandler
+    public void onChestPunch(PlayerInteractEvent event) {
+        if (event.getAction() != Action.LEFT_CLICK_BLOCK) return;
+        if (event.getClickedBlock() == null) return;
+        Player player = event.getPlayer();
+        if (!plugin.getGameManager().isInBedwarsWorld(player)) return;
+        if (!plugin.getGameManager().isRunning()) return;
+        if (plugin.getSetupMode().isInSetup(player)) return;
+        if (plugin.getSpectatorManager().isSpectator(player.getUniqueId())) return;
+        if (!(event.getClickedBlock().getState() instanceof org.bukkit.block.Container container)) return;
+
+        event.setCancelled(true);
+        Inventory chest = container.getInventory();
+        boolean movedAny = false;
+        ItemStack[] storage = player.getInventory().getStorageContents();
+        for (int i = 0; i < storage.length; i++) {
+            ItemStack it = storage[i];
+            if (it == null || it.getType() == Material.AIR) continue;
+            if (isKeptItem(it.getType())) continue;
+            var overflow = chest.addItem(it.clone());
+            if (overflow.isEmpty()) {
+                player.getInventory().setItem(i, null);
+                movedAny = true;
+            } else {
+                player.getInventory().setItem(i, overflow.get(0));
+            }
+        }
+        if (movedAny) {
+            player.playSound(player.getLocation(), org.bukkit.Sound.BLOCK_CHEST_CLOSE, 1f, 1.2f);
+            player.sendActionBar(Component.text("Deposited items into the chest", NamedTextColor.GREEN));
+        } else {
+            player.sendActionBar(Component.text("Nothing to deposit", NamedTextColor.GRAY));
+        }
+    }
+
+    /** Items never auto-deposited on a chest punch (kept on the player). */
+    private boolean isKeptItem(Material m) {
+        String n = m.name();
+        return n.endsWith("_SWORD") || n.endsWith("_PICKAXE") || n.endsWith("_AXE")
+                || m == Material.SHEARS || m == Material.COMPASS || m == Material.BOW
+                || m == Material.ARROW || n.endsWith("_BED");
+    }
+
+    @EventHandler
     public void onLobbyInteract(PlayerInteractEvent event) {
         if (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
         Player player = event.getPlayer();
