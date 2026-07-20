@@ -39,3 +39,16 @@ kit:
   give-on-spawn: true
   weapon: DIAMOND_SWORD
   build-block: SANDSTONE
+
+# Natural movement: record real players fighting in the duel world and replay their
+# movement + post-knockback recovery so bots move/land like humans. When no matching
+# recorded sample exists, the deterministic strafe/aim controllers are used as fallback.
+natural:
+  movement: true            # use recorded human samples when available
+  record-on-start: false    # begin recording when the plugin loads (else /duelbot record on)
+  record-radius: 8.0        # players within this distance of another player count as "dueling"
+  kb-trace-ticks: 10        # ticks of recovery trajectory captured after each knockback hit
+  max-samples-per-bucket: 3000  # cap per distance bucket (CLOSE/MID/FAR)
+  max-kb-traces: 800        # cap on stored knockback recovery traces
+  sample-noise: 0.15        # random variation added to sampled movement (0 = exact replay)
+  save-interval-ticks: 6000 # how often the dataset is flushed to human-samples.yml (async)

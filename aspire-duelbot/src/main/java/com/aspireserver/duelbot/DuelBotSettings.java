@@ -23,6 +23,16 @@ public final class DuelBotSettings {
     public boolean giveKit;
     public boolean defaultBlocksEnabled;
 
+    // ---- Human record/sample (natural movement) ----
+    public boolean naturalMovement;
+    public boolean recordOnStart;
+    public double recordRadius;
+    public int kbTraceTicks;
+    public int maxSamplesPerBucket;
+    public int maxKbTraces;
+    public double sampleNoise;
+    public int saveIntervalTicks;
+
     public void load(FileConfiguration cfg) {
         duelWorld = cfg.getString("duel-world", "");
         aggroRange = cfg.getDouble("aggro-range", 16.0);
@@ -40,6 +50,15 @@ public final class DuelBotSettings {
         buildMaterial = material(cfg.getString("kit.build-block", "SANDSTONE"), Material.SANDSTONE);
         giveKit = cfg.getBoolean("kit.give-on-spawn", true);
         defaultBlocksEnabled = cfg.getBoolean("blocks-enabled", true);
+
+        naturalMovement = cfg.getBoolean("natural.movement", true);
+        recordOnStart = cfg.getBoolean("natural.record-on-start", false);
+        recordRadius = cfg.getDouble("natural.record-radius", 8.0);
+        kbTraceTicks = cfg.getInt("natural.kb-trace-ticks", 10);
+        maxSamplesPerBucket = cfg.getInt("natural.max-samples-per-bucket", 3000);
+        maxKbTraces = cfg.getInt("natural.max-kb-traces", 800);
+        sampleNoise = cfg.getDouble("natural.sample-noise", 0.15);
+        saveIntervalTicks = cfg.getInt("natural.save-interval-ticks", 6000);
     }
 
     private Material material(String name, Material fallback) {

@@ -44,6 +44,9 @@ public final class DuelBotCommand implements CommandExecutor, TabCompleter {
             case "removeall" -> handleRemoveAll(sender);
             case "tier" -> handleTier(sender, args);
             case "blocks" -> handleBlocks(sender, args);
+            case "record" -> handleRecord(sender, args);
+            case "samples" -> handleSamples(sender);
+            case "clearsamples" -> handleClearSamples(sender);
             case "reload" -> {
                 plugin.reloadSettings();
                 sender.sendMessage(ChatColor.GREEN + "DuelBot config reloaded.");
@@ -168,6 +171,44 @@ public final class DuelBotCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(ChatColor.GREEN + "Set duel bot #" + nearest.getId() + " to tier " + tier + ".");
     }
 
+    private void handleRecord(CommandSender sender, String[] args) {
+        if (plugin.getRecorder() == null) {
+            sender.sendMessage(ChatColor.RED + "Recorder not available.");
+            return;
+        }
+        boolean enabled;
+        if (args.length >= 2) {
+            String v = args[1].toLowerCase();
+            enabled = v.equals("on") || v.equals("true") || v.equals("yes");
+        } else {
+            enabled = !plugin.getRecorder().isRecording();
+        }
+        plugin.getRecorder().setRecording(enabled);
+        sender.sendMessage(ChatColor.GREEN + "Human movement recording "
+                + (enabled ? ChatColor.AQUA + "ON" : ChatColor.YELLOW + "OFF")
+                + ChatColor.GRAY + " (duel world only).");
+    }
+
+    private void handleSamples(CommandSender sender) {
+        var store = plugin.getSampleStore();
+        boolean rec = plugin.getRecorder() != null && plugin.getRecorder().isRecording();
+        sender.sendMessage(ChatColor.GREEN + "Human samples "
+                + ChatColor.GRAY + "(recording: " + (rec ? ChatColor.AQUA + "ON" : ChatColor.YELLOW + "OFF") + ChatColor.GRAY + ")");
+        sender.sendMessage(ChatColor.GRAY + "  movement: " + ChatColor.YELLOW + store.totalMovement()
+                + ChatColor.GRAY + " (CLOSE " + store.movementCount(0)
+                + ", MID " + store.movementCount(1)
+                + ", FAR " + store.movementCount(2) + ")");
+        sender.sendMessage(ChatColor.GRAY + "  kb-traces: " + ChatColor.YELLOW + store.kbCount());
+        sender.sendMessage(ChatColor.GRAY + "  natural mode: "
+                + (plugin.getSettings().naturalMovement ? ChatColor.AQUA + "ON" : ChatColor.YELLOW + "OFF"));
+    }
+
+    private void handleClearSamples(CommandSender sender) {
+        plugin.getSampleStore().clear();
+        plugin.saveSamplesAsync();
+        sender.sendMessage(ChatColor.GREEN + "Cleared all recorded human samples.");
+    }
+
     private void handleInfo(CommandSender sender) {
         int count = 0;
         StringBuilder sb = new StringBuilder();
@@ -205,6 +246,8 @@ public final class DuelBotCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(ChatColor.GOLD + "/duelbot tier <tier> " + ChatColor.GRAY + "- retune nearest bot");
         sender.sendMessage(ChatColor.GOLD + "/duelbot blocks [on|off] " + ChatColor.GRAY + "- toggle blocks vs pure PvP");
         sender.sendMessage(ChatColor.GOLD + "/botkit " + ChatColor.GRAY + "- edit nearest bot's inventory");
+        sender.sendMessage(ChatColor.GOLD + "/duelbot record [on|off] " + ChatColor.GRAY + "- record real players' movement/kb");
+        sender.sendMessage(ChatColor.GOLD + "/duelbot samples | clearsamples " + ChatColor.GRAY + "- view/clear recorded data");
         sender.sendMessage(ChatColor.GOLD + "/duelbot remove | removeall");
         sender.sendMessage(ChatColor.GOLD + "/duelbot info | reload");
         sender.sendMessage(ChatColor.GRAY + "Tiers: " + plugin.getDifficultyConfig().tierNames());
@@ -215,14 +258,14 @@ public final class DuelBotCommand implements CommandExecutor, TabCompleter {
         List<String> out = new ArrayList<>();
         if (command.getName().equalsIgnoreCase("botkit")) return out;
         if (args.length == 1) {
-            for (String s : List.of("spawn", "tier", "blocks", "remove", "removeall", "info", "reload")) {
+            for (String s : List.of("spawn", "tier", "blocks", "record", "samples", "clearsamples", "remove", "removeall", "info", "reload")) {
                 if (s.startsWith(args[0].toLowerCase())) out.add(s);
             }
         } else if (args.length == 2 && (args[0].equalsIgnoreCase("spawn") || args[0].equalsIgnoreCase("tier"))) {
             for (String t : plugin.getDifficultyConfig().tierNames()) {
                 if (t.startsWith(args[1].toUpperCase())) out.add(t);
             }
-        } else if (args.length == 2 && args[0].equalsIgnoreCase("blocks")) {
+        } else if (args.length == 2 && (args[0].equalsIgnoreCase("blocks") || args[0].equalsIgnoreCase("record"))) {
             for (String s : List.of("on", "off")) {
                 if (s.startsWith(args[1].toLowerCase())) out.add(s);
             }

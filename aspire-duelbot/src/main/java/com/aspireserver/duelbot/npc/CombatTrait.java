@@ -14,6 +14,9 @@ import com.aspireserver.duelbot.combat.WTapController;
 import com.aspireserver.duelbot.config.DifficultyTier;
 import com.aspireserver.duelbot.fsm.BotState;
 import com.aspireserver.duelbot.fsm.StateMachine;
+import com.aspireserver.duelbot.learning.HumanSampleStore;
+import com.aspireserver.duelbot.learning.KbTrace;
+import com.aspireserver.duelbot.learning.MovementSample;
 import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.trait.Trait;
 import net.citizensnpcs.api.trait.TraitName;
@@ -67,6 +70,12 @@ public class CombatTrait extends Trait {
 
     private final Deque<Long> recentHits = new ArrayDeque<>();
     private long tickCounter;
+
+    // Human knockback-recovery replay state (see startKbReplay / tickKbReplay).
+    private KbTrace kbTrace;
+    private int kbIdx;
+    private double kbAlongX, kbAlongZ, kbSideX, kbSideZ;
+    private int jumpPending;
 
     public CombatTrait() {
         super("duelbot_combat");
@@ -169,6 +178,9 @@ public class CombatTrait extends Trait {
         }
         if (target != null) blockTap.observe(target);
 
+        // Human knockback-recovery replay owns velocity while it runs, regardless of FSM state.
+        tickKbReplay((Player) e);
+
         fsm.tick(this);
     }
 
@@ -255,6 +267,61 @@ public class CombatTrait extends Trait {
     public void recordIncomingHit() {
         recentHits.addLast(tickCounter);
         if (engageReactionTicks <= 0) engageReactionTicks = profile.nextReactionDelay();
+        startKbReplay();
+    }
+
+    /** Begins replaying a sampled human recovery trajectory aligned to the bot's knockback. */
+    private void startKbReplay() {
+        if (settings == null || !settings.naturalMovement) return;
+        Player bot = bot();
+        if (bot == null) return;
+        HumanSampleStore store = plugin.getSampleStore();
+        if (store == null || store.kbCount() == 0) return;
+
+        Vector v = bot.getVelocity();
+        double ax = v.getX(), az = v.getZ();
+        double h = Math.sqrt(ax * ax + az * az);
+        if (h < 1.0e-4) {
+            Vector away = target != null ? bot.getLocation().toVector().subtract(target.getLocation().toVector())
+                    : new Vector(0, 0, 1);
+            away.setY(0);
+            if (away.lengthSquared() < 1.0e-6) away = new Vector(0, 0, 1);
+            away.normalize();
+            ax = away.getX();
+            az = away.getZ();
+            h = 1.0;
+        }
+        KbTrace t = store.sampleKbTrace(h, v.getY(), profile.random());
+        if (t == null) return;
+        kbAlongX = ax / h;
+        kbAlongZ = az / h;
+        kbSideX = -kbAlongZ;
+        kbSideZ = kbAlongX;
+        kbTrace = t;
+        kbIdx = 0;
+    }
+
+    private boolean kbReplayActive() {
+        return kbTrace != null && kbIdx < kbTrace.length();
+    }
+
+    private void tickKbReplay(Player bot) {
+        if (!kbReplayActive()) {
+            kbTrace = null;
+            return;
+        }
+        double[] row = kbTrace.vel[kbIdx++];
+        java.util.Random r = profile.random();
+        double noise = settings.sampleNoise * 0.1;
+        double vx = kbAlongX * row[0] + kbSideX * row[2] + (r.nextDouble() * 2 - 1) * noise;
+        double vz = kbAlongZ * row[0] + kbSideZ * row[2] + (r.nextDouble() * 2 - 1) * noise;
+        double vy = row[1];
+        Vector cur = bot.getVelocity();
+        double blend = 0.5;
+        bot.setVelocity(new Vector(
+                cur.getX() + (vx - cur.getX()) * blend,
+                cur.getY() + (vy - cur.getY()) * blend,
+                cur.getZ() + (vz - cur.getZ()) * blend));
     }
 
     private void pruneHits() {
@@ -290,17 +357,63 @@ public class CombatTrait extends Trait {
     public void combatMovement() {
         Player bot = bot();
         if (bot == null || target == null) return;
+        if (kbReplayActive()) return; // recovery replay owns velocity
         double sep = bot.getLocation().distance(target.getLocation());
         if (sep > settings.combatRange) {
             npc.getNavigator().setTarget(target, true);
             return;
         }
         if (npc.getNavigator().isNavigating()) npc.getNavigator().cancelNavigation();
-        strafe.tick();
         if (wtap.active()) return; // W-tap owns velocity this tick
-        Vector move = strafe.desiredMove(bot.getLocation(), target.getLocation());
+
+        Vector move = desiredCombatMove(bot, sep);
+        // Keep combat spacing: back off if crowding the target, otherwise close in.
+        double ideal = Math.max(2.0, settings.combatRange * 0.6);
+        if (sep < ideal * 0.75) {
+            move.subtract(flatToTarget(bot).multiply(0.8)); // reverse forward to open space
+        }
+        if (move.lengthSquared() > 1.0e-6) move.normalize();
+
+        Vector desiredVel = move.multiply(settings.moveSpeed);
         Vector v = bot.getVelocity();
-        bot.setVelocity(new Vector(move.getX() * settings.moveSpeed, v.getY(), move.getZ() * settings.moveSpeed));
+        // Acceleration-limited so direction changes are smooth, not teleporty. Less control mid-air.
+        double accel = bot.isOnGround() ? 0.35 : 0.10;
+        double nx = v.getX() + (desiredVel.getX() - v.getX()) * accel;
+        double nz = v.getZ() + (desiredVel.getZ() - v.getZ()) * accel;
+        double ny = v.getY();
+        if (jumpPending > 0 && bot.isOnGround()) {
+            ny = 0.42; // human-like hop sampled from recorded traces
+            jumpPending = 0;
+        } else if (jumpPending > 0) {
+            jumpPending--;
+        }
+        bot.setVelocity(new Vector(nx, ny, nz));
+    }
+
+    /** Sampled human micro-movement when data exists, else the deterministic strafe controller. */
+    private Vector desiredCombatMove(Player bot, double sep) {
+        if (settings.naturalMovement && plugin.getSampleStore() != null) {
+            MovementSample ms = plugin.getSampleStore()
+                    .sampleMovement(MovementSample.bucketOf(sep), profile.random());
+            if (ms != null) {
+                java.util.Random r = profile.random();
+                double noise = settings.sampleNoise;
+                double fwd = ms.forward() + (r.nextDouble() * 2 - 1) * noise;
+                double str = ms.strafe() + (r.nextDouble() * 2 - 1) * noise;
+                if (ms.jump() && jumpPending <= 0) jumpPending = 1;
+                Vector f = flatToTarget(bot);
+                Vector right = new Vector(-f.getZ(), 0, f.getX());
+                return f.multiply(fwd).add(right.multiply(str));
+            }
+        }
+        strafe.tick();
+        return strafe.desiredMove(bot.getLocation(), target.getLocation());
+    }
+
+    private Vector flatToTarget(Player bot) {
+        Vector d = target.getLocation().toVector().subtract(bot.getLocation().toVector());
+        d.setY(0);
+        return d.lengthSquared() < 1.0e-6 ? new Vector(0, 0, 1) : d.normalize();
     }
 
     public void tickCombatSwing() {
@@ -326,6 +439,7 @@ public class CombatTrait extends Trait {
         if (!swing.ready()) return;
         if (!swing.inReach(bot, target, profile.tier().reach)) return;
         if (!aim.onTarget(bot, target, settings.aimToleranceDegrees)) return;
+        if (!bot.hasLineOfSight(target)) return; // never swing through walls
 
         boolean wantCrit = critJump.canJump(bot) && profile.rollCrit();
         if (wantCrit) {
@@ -344,6 +458,7 @@ public class CombatTrait extends Trait {
     private void executeAttack(Player bot, boolean attemptCrit) {
         if (target == null || !isValidTarget(target)) return;
         if (!swing.inReach(bot, target, profile.tier().reach)) return;
+        if (!bot.hasLineOfSight(target)) return;
         double dmg = weaponDamage(bot);
         boolean crit = attemptCrit && critJump.critValid(bot, bot.isSprinting());
         if (crit) {

@@ -58,6 +58,11 @@ public final class AimController {
         double decay = Math.exp(-settleTicks / Math.max(0.001, tier.aimTau));
         targetYaw += offsetYaw0 * decay;
         targetPitch += offsetPitch0 * decay;
+        // Small permanent micro-wander so a settled aim is never perfectly locked (anti-robotic).
+        Random r = profile.random();
+        double jitter = tier.aimOffset0 * 0.08 + 0.15;
+        targetYaw += (r.nextDouble() * 2.0 - 1.0) * jitter;
+        targetPitch += (r.nextDouble() * 2.0 - 1.0) * jitter * 0.5;
         settleTicks++;
 
         if (!initialized) {

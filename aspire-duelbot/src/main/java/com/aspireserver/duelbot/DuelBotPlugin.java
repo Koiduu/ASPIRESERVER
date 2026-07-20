@@ -1,6 +1,8 @@
 package com.aspireserver.duelbot;
 
 import com.aspireserver.duelbot.config.DifficultyConfig;
+import com.aspireserver.duelbot.learning.HumanSampleStore;
+import com.aspireserver.duelbot.learning.MovementRecorder;
 import com.aspireserver.duelbot.npc.CombatTrait;
 import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.trait.TraitInfo;
@@ -19,6 +21,9 @@ public final class DuelBotPlugin extends JavaPlugin {
 
     private final DuelBotSettings settings = new DuelBotSettings();
     private DifficultyConfig difficultyConfig;
+
+    private final HumanSampleStore sampleStore = new HumanSampleStore();
+    private MovementRecorder recorder;
 
     public static DuelBotPlugin get() {
         return instance;
@@ -55,12 +60,49 @@ public final class DuelBotPlugin extends JavaPlugin {
         }
         getServer().getPluginManager().registerEvents(new DuelBotListener(), this);
 
+        sampleStore.configure(settings.maxSamplesPerBucket, settings.maxKbTraces);
+        sampleStore.load(sampleFile(), getLogger());
+        recorder = new MovementRecorder(this, sampleStore);
+        recorder.setRecording(settings.recordOnStart);
+        getServer().getPluginManager().registerEvents(recorder, this);
+        getServer().getScheduler().runTaskTimer(this, recorder, 1L, 1L);
+        int saveEvery = Math.max(200, settings.saveIntervalTicks);
+        getServer().getScheduler().runTaskTimer(this, this::saveSamplesAsync, saveEvery, saveEvery);
+
         getLogger().info("AspireDuelBot enabled (tiers: " + difficultyConfig.tierNames() + ").");
+    }
+
+    @Override
+    public void onDisable() {
+        if (recorder != null) {
+            HumanSampleStore.Snapshot snap = sampleStore.snapshotForSave();
+            HumanSampleStore.save(snap, sampleFile(), getLogger()); // synchronous on shutdown
+        }
+    }
+
+    private File sampleFile() {
+        return new File(getDataFolder(), "human-samples.yml");
+    }
+
+    /** Copies an immutable snapshot on the main thread, then writes it off-thread. */
+    public void saveSamplesAsync() {
+        HumanSampleStore.Snapshot snap = sampleStore.snapshotForSave();
+        getServer().getScheduler().runTaskAsynchronously(this,
+                () -> HumanSampleStore.save(snap, sampleFile(), getLogger()));
+    }
+
+    public HumanSampleStore getSampleStore() {
+        return sampleStore;
+    }
+
+    public MovementRecorder getRecorder() {
+        return recorder;
     }
 
     public void reloadSettings() {
         reloadConfig();
         settings.load(getConfig());
+        sampleStore.configure(settings.maxSamplesPerBucket, settings.maxKbTraces);
 
         File file = new File(getDataFolder(), "difficulty.yml");
         if (!file.exists()) saveResource("difficulty.yml", false);
