@@ -331,15 +331,20 @@ public class ShopManager {
         ItemStack sword = b.build();
 
         var inv = player.getInventory();
-        int targetSlot = -1;
+        int existingSwordSlot = -1;
         for (int i = 0; i < inv.getSize(); i++) {
             ItemStack it = inv.getItem(i);
             if (it != null && isSword(it.getType())) {
-                if (targetSlot == -1) targetSlot = i;
+                if (existingSwordSlot == -1) existingSwordSlot = i;
                 inv.setItem(i, null);
             }
         }
-        if (targetSlot == -1) targetSlot = inv.firstEmpty();
+        int configured = plugin.getSetupConfig().getHotbarSlot("sword");
+        if (configured >= 0) {
+            plugin.getGameManager().placeAtSlot(player, configured, sword);
+            return;
+        }
+        int targetSlot = existingSwordSlot != -1 ? existingSwordSlot : inv.firstEmpty();
         if (targetSlot >= 0) inv.setItem(targetSlot, sword);
         else give(player, sword);
     }

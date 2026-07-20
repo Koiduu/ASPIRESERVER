@@ -47,6 +47,7 @@ public class SetupConfigManager {
     private int disconnectGraceSeconds;
     private int sharpnessCap;
     private final List<LoadoutItem> loadout = new ArrayList<>();
+    private final Map<String, Integer> hotbarSlots = new HashMap<>();
 
     public SetupConfigManager(AspireBedwars plugin) {
         this.plugin = plugin;
@@ -74,7 +75,23 @@ public class SetupConfigManager {
         sharpnessCap = plugin.getConfig().getInt("sharpness-cap", 3);
 
         loadLoadout();
+        loadHotbarSlots();
         loadSetup();
+    }
+
+    private void loadHotbarSlots() {
+        hotbarSlots.clear();
+        hotbarSlots.put("sword", plugin.getConfig().getInt("hotbar-slots.sword", 0));
+        hotbarSlots.put("pickaxe", plugin.getConfig().getInt("hotbar-slots.pickaxe", 7));
+        hotbarSlots.put("axe", plugin.getConfig().getInt("hotbar-slots.axe", 6));
+        hotbarSlots.put("shears", plugin.getConfig().getInt("hotbar-slots.shears", 8));
+    }
+
+    /** Preferred hotbar slot (0-8) for a shop tool/sword, or -1 to use the first free slot. */
+    public int getHotbarSlot(String key) {
+        Integer slot = hotbarSlots.get(key);
+        if (slot == null || slot < 0 || slot > 8) return -1;
+        return slot;
     }
 
     private void loadLoadout() {

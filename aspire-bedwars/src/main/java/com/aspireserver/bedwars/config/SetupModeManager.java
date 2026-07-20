@@ -11,6 +11,8 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Particle;
+import org.bukkit.block.Block;
+import org.bukkit.block.data.type.Bed;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -33,8 +35,12 @@ public class SetupModeManager implements Listener {
     private final Map<UUID, TeamColor> selectedTeam = new HashMap<>();
     private final Map<UUID, GeneratorType> selectedGen = new HashMap<>();
     private final List<ArmorStand> markers = new ArrayList<>();
+    private final Map<UUID, Long> lastToolUse = new HashMap<>();
     private boolean markersShown = false;
     private BukkitTask particleTask;
+
+    private static final long SETUP_COOLDOWN_MS = 2000L;
+    private static final int BED_SEARCH_RADIUS = 5;
 
     public SetupModeManager(AspireBedwars plugin) {
         this.plugin = plugin;
@@ -58,6 +64,7 @@ public class SetupModeManager implements Listener {
 
     public void exit(Player player) {
         setupPlayers.remove(player.getUniqueId());
+        lastToolUse.remove(player.getUniqueId());
         player.getInventory().clear();
         player.sendMessage(Component.text("Exited setup mode.", NamedTextColor.YELLOW));
         if (setupPlayers.isEmpty() && particleTask != null) { particleTask.cancel(); particleTask = null; }
@@ -101,6 +108,15 @@ public class SetupModeManager implements Listener {
         if (action == null) return;
         event.setCancelled(true);
 
+        long now = System.currentTimeMillis();
+        Long last = lastToolUse.get(player.getUniqueId());
+        if (last != null && now - last < SETUP_COOLDOWN_MS) {
+            long remain = (SETUP_COOLDOWN_MS - (now - last) + 999) / 1000;
+            player.sendActionBar(Component.text("Setup tool on cooldown (" + remain + "s)", NamedTextColor.RED));
+            return;
+        }
+        lastToolUse.put(player.getUniqueId(), now);
+
         Location blockLoc = event.getClickedBlock() != null ? event.getClickedBlock().getLocation() : player.getLocation();
         TeamColor team = selectedTeam.get(player.getUniqueId());
         GeneratorType gen = selectedGen.get(player.getUniqueId());
@@ -127,9 +143,11 @@ public class SetupModeManager implements Listener {
                 msg(player, "Lobby spawn set.");
             }
             case "bed" -> {
-                plugin.getSetupConfig().setTeamBed(team, blockLoc);
+                Location bedLoc = findNearestBed(player.getLocation());
+                if (bedLoc == null) bedLoc = blockLoc;
+                plugin.getSetupConfig().setTeamBed(team, bedLoc);
                 plugin.getSetupConfig().save();
-                msg(player, team.displayName() + " bed set at " + coords(blockLoc));
+                msg(player, team.displayName() + " bed set at " + coords(bedLoc));
             }
             case "gen_place" -> {
                 GeneratorType placeType = readGenType(hand, gen);
@@ -143,6 +161,30 @@ public class SetupModeManager implements Listener {
             default -> {}
         }
         if (markersShown) refreshMarkers();
+    }
+
+    /**
+     * Finds the closest real bed block near the player and returns its FOOT location,
+     * so admins can physically place a bed and snap the config to it with one click.
+     */
+    private Location findNearestBed(Location origin) {
+        if (origin.getWorld() == null) return null;
+        Location best = null;
+        double bestDist = Double.MAX_VALUE;
+        int base = origin.getBlockY();
+        for (int x = -BED_SEARCH_RADIUS; x <= BED_SEARCH_RADIUS; x++) {
+            for (int y = -BED_SEARCH_RADIUS; y <= BED_SEARCH_RADIUS; y++) {
+                for (int z = -BED_SEARCH_RADIUS; z <= BED_SEARCH_RADIUS; z++) {
+                    Block b = origin.getWorld().getBlockAt(origin.getBlockX() + x, base + y, origin.getBlockZ() + z);
+                    if (!(b.getBlockData() instanceof Bed bed)) continue;
+                    Block foot = bed.getPart() == Bed.Part.HEAD
+                            ? b.getRelative(bed.getFacing().getOppositeFace()) : b;
+                    double d = foot.getLocation().add(0.5, 0.5, 0.5).distanceSquared(origin);
+                    if (d < bestDist) { bestDist = d; best = foot.getLocation(); }
+                }
+            }
+        }
+        return best;
     }
 
     private GeneratorType readGenType(ItemStack hand, GeneratorType fallback) {

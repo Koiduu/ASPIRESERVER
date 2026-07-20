@@ -373,8 +373,18 @@ public class GameManager {
         for (com.aspireserver.bedwars.config.LoadoutItem item : plugin.getSetupConfig().getLoadout()) {
             ItemBuilder b = new ItemBuilder(item.material, item.amount);
             if (item.unbreakable) b.unbreakable();
-            player.getInventory().addItem(b.build());
+            if (isSwordMaterial(item.material)) {
+                placeAtSlot(player, plugin.getSetupConfig().getHotbarSlot("sword"), b.build());
+            } else {
+                player.getInventory().addItem(b.build());
+            }
         }
+    }
+
+    public static boolean isSwordMaterial(Material mat) {
+        return mat == Material.WOODEN_SWORD || mat == Material.STONE_SWORD
+                || mat == Material.GOLDEN_SWORD || mat == Material.IRON_SWORD
+                || mat == Material.DIAMOND_SWORD || mat == Material.NETHERITE_SWORD;
     }
 
     public void applyArmor(Player player) {
@@ -426,9 +436,23 @@ public class GameManager {
         player.getInventory().remove(Material.DIAMOND_AXE);
         player.getInventory().remove(Material.SHEARS);
 
-        if (data.pickaxeTier > 0) player.getInventory().addItem(pickaxeFor(data.pickaxeTier));
-        if (data.axeTier > 0) player.getInventory().addItem(axeFor(data.axeTier));
-        if (data.shears) player.getInventory().addItem(new ItemBuilder(Material.SHEARS).unbreakable().build());
+        if (data.pickaxeTier > 0) placeAtSlot(player, plugin.getSetupConfig().getHotbarSlot("pickaxe"), pickaxeFor(data.pickaxeTier));
+        if (data.axeTier > 0) placeAtSlot(player, plugin.getSetupConfig().getHotbarSlot("axe"), axeFor(data.axeTier));
+        if (data.shears) placeAtSlot(player, plugin.getSetupConfig().getHotbarSlot("shears"), new ItemBuilder(Material.SHEARS).unbreakable().build());
+    }
+
+    /** Places an item at the given hotbar slot (0-8), relocating any displaced item; falls back to addItem. */
+    public void placeAtSlot(Player player, int slot, ItemStack item) {
+        var inv = player.getInventory();
+        if (slot < 0 || slot > 8) {
+            inv.addItem(item);
+            return;
+        }
+        ItemStack existing = inv.getItem(slot);
+        inv.setItem(slot, item);
+        if (existing != null && existing.getType() != Material.AIR) {
+            inv.addItem(existing);
+        }
     }
 
     private ItemStack pickaxeFor(int tier) {

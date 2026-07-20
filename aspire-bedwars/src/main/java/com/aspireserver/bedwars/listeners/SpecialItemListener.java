@@ -14,6 +14,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
@@ -48,19 +49,39 @@ public class SpecialItemListener implements Listener {
 
         event.setCancelled(true);
 
-        // Hypixel-style fireball: flies straight at constant speed, no gravity, no fire.
-        // Vanilla explosion is neutralised (yield 0) and replaced with a custom knockback
-        // burst on impact so it launches players and only breaks player-placed blocks.
+        // Hypixel-style fireball: launches instantly and flies straight, no gravity, no fire.
+        // Spawned just in front of the eyes and driven by acceleration (setDirection) so it
+        // shoots off immediately instead of stalling. Vanilla explosion is neutralised (yield 0)
+        // and replaced with a custom knockback burst on impact so it launches players and only
+        // breaks player-placed blocks.
         Vector dir = player.getEyeLocation().getDirection().normalize();
-        Fireball fireball = player.launchProjectile(Fireball.class, dir);
+        Location spawnLoc = player.getEyeLocation().add(dir.clone().multiply(0.8));
+        Fireball fireball = player.getWorld().spawn(spawnLoc, Fireball.class);
+        fireball.setShooter(player);
         fireball.setYield(0f);
         fireball.setIsIncendiary(false);
-        fireball.setShooter(player);
-        fireball.setVelocity(dir.multiply(FIREBALL_SPEED));
-        fireball.setAcceleration(new Vector(0, 0, 0));
+        fireball.setDirection(dir.clone().multiply(FIREBALL_SPEED));
+        fireball.setVelocity(dir.clone().multiply(FIREBALL_SPEED));
         player.getWorld().playSound(player.getLocation(), Sound.ITEM_FIRECHARGE_USE, 1f, 1f);
 
         hand.setAmount(hand.getAmount() - 1);
+    }
+
+    // Hitting a fireball deflects it: it redirects along the striker's aim and becomes theirs.
+    @EventHandler
+    public void onFireballDeflect(EntityDamageByEntityEvent event) {
+        if (!(event.getEntity() instanceof Fireball fireball)) return;
+        if (!(event.getDamager() instanceof Player player)) return;
+        if (!fireball.getWorld().getName().equalsIgnoreCase(plugin.getSetupConfig().getWorldName())) return;
+        if (!plugin.getGameManager().isRunning()) return;
+        if (plugin.getSpectatorManager().isSpectator(player.getUniqueId())) return;
+
+        event.setCancelled(true);
+        Vector dir = player.getEyeLocation().getDirection().normalize();
+        fireball.setShooter(player);
+        fireball.setDirection(dir.clone().multiply(FIREBALL_SPEED));
+        fireball.setVelocity(dir.clone().multiply(FIREBALL_SPEED));
+        fireball.getWorld().playSound(fireball.getLocation(), Sound.ENTITY_ARROW_HIT_PLAYER, 1f, 1.4f);
     }
 
     private static final double FIREBALL_SPEED = 1.2;

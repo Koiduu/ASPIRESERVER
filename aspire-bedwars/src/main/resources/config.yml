@@ -38,6 +38,15 @@ loadout:
     amount: 1
     unbreakable: true
 
+# Preferred hotbar slots (0-8) for purchased/kept gear. Applied on purchase AND respawn,
+# so tools always land in the same spot without manual rearranging.
+# Set a value to -1 to just use the first free slot instead.
+hotbar-slots:
+  sword: 0
+  pickaxe: 7
+  axe: 6
+  shears: 8
+
 # Custom shop profile (optional).
 #   custom-items: adds plain "give" entries, or overrides an existing id.
 #   quick-buy:    replaces the default Quick Buy tab (ids must exist in the catalog).
