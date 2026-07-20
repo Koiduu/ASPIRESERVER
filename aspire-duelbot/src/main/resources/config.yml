@@ -1,0 +1,37 @@
+# AspireDuelBot — global settings.
+# All bot behaviour is confined to the configured duels world.
+
+# Name of the duels world. Leave blank to allow bots in any world the command is run in.
+duel-world: ''
+
+# Default difficulty tier used when /duelbot spawn is run with no tier argument.
+default-tier: MEDIUM
+
+# Engagement radii (blocks).
+aggro-range: 16.0
+disengage-range: 24.0
+# Within this separation the bot orbit-strafes; beyond it, it paths in via the Navigator.
+combat-range: 4.0
+
+# Max angular error (degrees) between smoothed aim and the target before a swing is allowed.
+aim-tolerance-degrees: 12.0
+
+# PANIC-state thresholds.
+panic-health-ratio: 0.3      # drop below this fraction of max health...
+reengage-health-ratio: 0.6   # ...and recover above this to leave PANIC
+hit-window-ticks: 40         # rolling window for measuring incoming hit frequency
+hit-count-threshold: 4       # hits within the window that count as "under pressure"
+
+# How often (ticks) the bot re-scans for the nearest valid target.
+retarget-interval-ticks: 10
+
+# Offensive block-tap prediction horizon (ticks ahead of the opponent's feet).
+block-tap-ticks-ahead: 2
+
+# Strafe/close movement speed (blocks per tick applied as horizontal velocity).
+move-speed: 0.27
+
+kit:
+  give-on-spawn: true
+  weapon: DIAMOND_SWORD
+  build-block: SANDSTONE
