@@ -49,6 +49,10 @@ public final class DuelBotPlugin extends JavaPlugin {
             getCommand("duelbot").setExecutor(cmd);
             getCommand("duelbot").setTabCompleter(cmd);
         }
+        if (getCommand("botkit") != null) {
+            getCommand("botkit").setExecutor(cmd);
+            getCommand("botkit").setTabCompleter(cmd);
+        }
         getServer().getPluginManager().registerEvents(new DuelBotListener(), this);
 
         getLogger().info("AspireDuelBot enabled (tiers: " + difficultyConfig.tierNames() + ").");

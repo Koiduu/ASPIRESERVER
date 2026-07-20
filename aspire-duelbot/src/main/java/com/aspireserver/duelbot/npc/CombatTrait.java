@@ -41,6 +41,7 @@ import java.util.Deque;
 public class CombatTrait extends Trait {
 
     private String tierName;
+    private Boolean blocksEnabled;
 
     private DuelBotPlugin plugin;
     private DuelBotSettings settings;
@@ -74,11 +75,22 @@ public class CombatTrait extends Trait {
     @Override
     public void load(DataKey key) {
         this.tierName = key.getString("tier", null);
+        if (key.keyExists("blocks")) this.blocksEnabled = key.getBoolean("blocks", true);
     }
 
     @Override
     public void save(DataKey key) {
         if (tierName != null) key.setString("tier", tierName);
+        if (blocksEnabled != null) key.setBoolean("blocks", blocksEnabled);
+    }
+
+    public boolean blocksEnabled() {
+        return blocksEnabled == null || blocksEnabled;
+    }
+
+    public void setBlocksEnabled(boolean enabled) {
+        this.blocksEnabled = enabled;
+        if (!enabled && boxIn != null) boxIn.abort();
     }
 
     public void setTier(String tierName) {
@@ -91,6 +103,7 @@ public class CombatTrait extends Trait {
         this.plugin = DuelBotPlugin.get();
         if (plugin == null) return;
         this.settings = plugin.getSettings();
+        if (blocksEnabled == null) blocksEnabled = settings.defaultBlocksEnabled;
         initControllers();
 
         npc.setProtected(false);
@@ -342,6 +355,7 @@ public class CombatTrait extends Trait {
     }
 
     public void tryBlockTap() {
+        if (!blocksEnabled()) return;
         Player bot = bot();
         if (bot == null || target == null) return;
         if (!blockTap.ready()) return;
@@ -349,16 +363,19 @@ public class CombatTrait extends Trait {
     }
 
     public void beginBoxIn() {
+        if (!blocksEnabled()) return;
         if (!boxIn.isActive()) boxIn.start();
     }
 
     public void tickBoxIn() {
+        if (!blocksEnabled()) return;
         Player bot = bot();
         if (bot == null || target == null) return;
         boxIn.tick(bot, target);
     }
 
     public void tickClutch() {
+        if (!blocksEnabled()) return;
         Player bot = bot();
         if (bot == null) return;
         if (clutch.shouldPlaceNow(bot, 2) || bot.getVelocity().getY() < -0.55) {
@@ -373,6 +390,11 @@ public class CombatTrait extends Trait {
     private Player bot() {
         Entity e = npc.getEntity();
         return e instanceof Player p ? p : null;
+    }
+
+    /** The underlying Bukkit player entity, or null if not spawned as a player. */
+    public Player botPlayer() {
+        return bot();
     }
 
     private Vector horizontalForward(Player bot) {

@@ -30,6 +30,10 @@ public final class DuelBotCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.RED + "No permission.");
             return true;
         }
+        if (command.getName().equalsIgnoreCase("botkit")) {
+            handleBotKit(sender);
+            return true;
+        }
         if (args.length == 0) {
             usage(sender);
             return true;
@@ -39,6 +43,7 @@ public final class DuelBotCommand implements CommandExecutor, TabCompleter {
             case "remove" -> handleRemove(sender);
             case "removeall" -> handleRemoveAll(sender);
             case "tier" -> handleTier(sender, args);
+            case "blocks" -> handleBlocks(sender, args);
             case "reload" -> {
                 plugin.reloadSettings();
                 sender.sendMessage(ChatColor.GREEN + "DuelBot config reloaded.");
@@ -47,6 +52,50 @@ public final class DuelBotCommand implements CommandExecutor, TabCompleter {
             default -> usage(sender);
         }
         return true;
+    }
+
+    private void handleBlocks(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(ChatColor.RED + "Only players can use /duelbot blocks.");
+            return;
+        }
+        NPC npc = nearestBot(player);
+        if (npc == null) {
+            sender.sendMessage(ChatColor.RED + "No duel bot found nearby.");
+            return;
+        }
+        CombatTrait trait = npc.getTraitNullable(CombatTrait.class);
+        boolean enabled;
+        if (args.length >= 2) {
+            String v = args[1].toLowerCase();
+            enabled = v.equals("on") || v.equals("true") || v.equals("yes");
+        } else {
+            enabled = !trait.blocksEnabled(); // toggle
+        }
+        trait.setBlocksEnabled(enabled);
+        sender.sendMessage(ChatColor.GREEN + "Duel bot #" + npc.getId() + " block mechanics "
+                + (enabled ? ChatColor.AQUA + "ENABLED (full blocks)" : ChatColor.YELLOW + "DISABLED (pure PvP)") + ".");
+    }
+
+    private void handleBotKit(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(ChatColor.RED + "Only players can use /botkit.");
+            return;
+        }
+        NPC npc = nearestBot(player);
+        if (npc == null) {
+            sender.sendMessage(ChatColor.RED + "No duel bot found nearby.");
+            return;
+        }
+        CombatTrait trait = npc.getTraitNullable(CombatTrait.class);
+        Player bot = trait != null ? trait.botPlayer() : null;
+        if (bot == null) {
+            sender.sendMessage(ChatColor.RED + "That bot isn't spawned as a player.");
+            return;
+        }
+        player.openInventory(bot.getInventory());
+        sender.sendMessage(ChatColor.GREEN + "Editing kit for duel bot #" + npc.getId()
+                + ". Changes apply when you close the inventory.");
     }
 
     private void handleSpawn(CommandSender sender, String[] args) {
@@ -77,18 +126,7 @@ public final class DuelBotCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.RED + "Only players can use /duelbot remove.");
             return;
         }
-        NPC nearest = null;
-        double best = Double.MAX_VALUE;
-        for (NPC npc : CitizensAPI.getNPCRegistry()) {
-            if (npc.getTraitNullable(CombatTrait.class) == null) continue;
-            if (!npc.isSpawned() || npc.getEntity() == null) continue;
-            if (!npc.getEntity().getWorld().equals(player.getWorld())) continue;
-            double d = npc.getEntity().getLocation().distanceSquared(player.getLocation());
-            if (d < best) {
-                best = d;
-                nearest = npc;
-            }
-        }
+        NPC nearest = nearestBot(player);
         if (nearest == null) {
             sender.sendMessage(ChatColor.RED + "No duel bot found nearby.");
             return;
@@ -121,17 +159,7 @@ public final class DuelBotCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.RED + "Unknown tier '" + tier + "'.");
             return;
         }
-        NPC nearest = null;
-        double best = Double.MAX_VALUE;
-        for (NPC npc : CitizensAPI.getNPCRegistry()) {
-            if (npc.getTraitNullable(CombatTrait.class) == null || !npc.isSpawned() || npc.getEntity() == null) continue;
-            if (!npc.getEntity().getWorld().equals(player.getWorld())) continue;
-            double d = npc.getEntity().getLocation().distanceSquared(player.getLocation());
-            if (d < best) {
-                best = d;
-                nearest = npc;
-            }
-        }
+        NPC nearest = nearestBot(player);
         if (nearest == null) {
             sender.sendMessage(ChatColor.RED + "No duel bot found nearby.");
             return;
@@ -157,9 +185,26 @@ public final class DuelBotCommand implements CommandExecutor, TabCompleter {
         if (count > 0) sender.sendMessage(sb.toString().trim());
     }
 
+    private NPC nearestBot(Player player) {
+        NPC nearest = null;
+        double best = Double.MAX_VALUE;
+        for (NPC npc : CitizensAPI.getNPCRegistry()) {
+            if (npc.getTraitNullable(CombatTrait.class) == null || !npc.isSpawned() || npc.getEntity() == null) continue;
+            if (!npc.getEntity().getWorld().equals(player.getWorld())) continue;
+            double d = npc.getEntity().getLocation().distanceSquared(player.getLocation());
+            if (d < best) {
+                best = d;
+                nearest = npc;
+            }
+        }
+        return nearest;
+    }
+
     private void usage(CommandSender sender) {
         sender.sendMessage(ChatColor.GOLD + "/duelbot spawn [tier] " + ChatColor.GRAY + "- spawn a bot at your location");
         sender.sendMessage(ChatColor.GOLD + "/duelbot tier <tier> " + ChatColor.GRAY + "- retune nearest bot");
+        sender.sendMessage(ChatColor.GOLD + "/duelbot blocks [on|off] " + ChatColor.GRAY + "- toggle blocks vs pure PvP");
+        sender.sendMessage(ChatColor.GOLD + "/botkit " + ChatColor.GRAY + "- edit nearest bot's inventory");
         sender.sendMessage(ChatColor.GOLD + "/duelbot remove | removeall");
         sender.sendMessage(ChatColor.GOLD + "/duelbot info | reload");
         sender.sendMessage(ChatColor.GRAY + "Tiers: " + plugin.getDifficultyConfig().tierNames());
@@ -168,13 +213,18 @@ public final class DuelBotCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> out = new ArrayList<>();
+        if (command.getName().equalsIgnoreCase("botkit")) return out;
         if (args.length == 1) {
-            for (String s : List.of("spawn", "tier", "remove", "removeall", "info", "reload")) {
+            for (String s : List.of("spawn", "tier", "blocks", "remove", "removeall", "info", "reload")) {
                 if (s.startsWith(args[0].toLowerCase())) out.add(s);
             }
         } else if (args.length == 2 && (args[0].equalsIgnoreCase("spawn") || args[0].equalsIgnoreCase("tier"))) {
             for (String t : plugin.getDifficultyConfig().tierNames()) {
                 if (t.startsWith(args[1].toUpperCase())) out.add(t);
+            }
+        } else if (args.length == 2 && args[0].equalsIgnoreCase("blocks")) {
+            for (String s : List.of("on", "off")) {
+                if (s.startsWith(args[1].toLowerCase())) out.add(s);
             }
         }
         return out;

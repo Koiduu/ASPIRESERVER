@@ -31,6 +31,10 @@ block-tap-ticks-ahead: 2
 # Strafe/close movement speed (blocks per tick applied as horizontal velocity).
 move-speed: 0.27
 
+# Default for new bots: true = full block mechanics (clutch/box-in/block-tap),
+# false = pure PvP (no block placement at all). Toggle per-bot with /duelbot blocks.
+blocks-enabled: true
+
 kit:
   give-on-spawn: true
   weapon: DIAMOND_SWORD

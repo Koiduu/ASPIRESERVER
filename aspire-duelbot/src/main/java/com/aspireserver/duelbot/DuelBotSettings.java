@@ -21,6 +21,7 @@ public final class DuelBotSettings {
     public Material weaponMaterial;
     public Material buildMaterial;
     public boolean giveKit;
+    public boolean defaultBlocksEnabled;
 
     public void load(FileConfiguration cfg) {
         duelWorld = cfg.getString("duel-world", "");
@@ -38,6 +39,7 @@ public final class DuelBotSettings {
         weaponMaterial = material(cfg.getString("kit.weapon", "DIAMOND_SWORD"), Material.DIAMOND_SWORD);
         buildMaterial = material(cfg.getString("kit.build-block", "SANDSTONE"), Material.SANDSTONE);
         giveKit = cfg.getBoolean("kit.give-on-spawn", true);
+        defaultBlocksEnabled = cfg.getBoolean("blocks-enabled", true);
     }
 
     private Material material(String name, Material fallback) {

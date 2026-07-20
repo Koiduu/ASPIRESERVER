@@ -8,7 +8,11 @@ depend: [Citizens]
 commands:
   duelbot:
     description: Spawn and manage PvP duel bots.
-    usage: /duelbot spawn|remove|removeall|tier|info|reload
+    usage: /duelbot spawn|remove|removeall|tier|blocks|info|reload
+    permission: duelbot.admin
+  botkit:
+    description: Open the nearest duel bot's inventory to edit its kit.
+    usage: /botkit
     permission: duelbot.admin
 permissions:
   duelbot.admin:
