@@ -51,7 +51,7 @@ public class MobCapListener implements Listener {
             switch (event.getSpawnReason()) {
                 case SPAWNER_EGG, COMMAND, CUSTOM -> { } // let admins force these
                 default -> {
-                    if (plugin.getConfig().getBoolean("armadillo-protection.enabled", true)) {
+                    if (plugin.getConfig().getBoolean("armadillo-protection.enabled", false)) {
                         event.setCancelled(true);
                         return;
                     }

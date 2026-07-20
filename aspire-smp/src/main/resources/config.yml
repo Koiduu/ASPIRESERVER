@@ -22,10 +22,11 @@ mob-cap:
   enabled: true
   per-player: 40
 
-# Keep undead (zombies, skeletons, phantoms, zoglins) from spawning near armadillos so they
-# don't roll up / get scared — lets scute farms and armadillo pens work. Radius in blocks.
+# Optional: keep undead (zombies, skeletons, phantoms, zoglins) from spawning near armadillos
+# so they don't roll up / get scared — for scute farms. DISABLED by default so armadillos
+# behave like vanilla (get scared by undead). Set enabled: true to protect scute farms.
 armadillo-protection:
-  enabled: true
+  enabled: false
   radius: 12.0
 
 # One-player sleep
