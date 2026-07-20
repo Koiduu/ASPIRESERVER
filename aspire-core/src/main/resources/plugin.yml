@@ -1,5 +1,5 @@
 name: AspireCore
-version: '1.0.0'
+version: '26.2'
 main: com.aspireserver.core.AspireCore
 api-version: '1.21'
 description: Core network module for Aspire Server

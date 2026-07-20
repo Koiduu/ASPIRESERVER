@@ -1,5 +1,5 @@
 name: AspireCreative
-version: '1.0.0'
+version: '26.2'
 main: com.aspireserver.creative.AspireCreative
 api-version: '1.21'
 description: Creative plot world with tier system

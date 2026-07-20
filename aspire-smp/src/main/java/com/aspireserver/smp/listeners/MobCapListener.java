@@ -37,20 +37,21 @@ public class MobCapListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onCreatureSpawn(CreatureSpawnEvent event) {
-        if (event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.CUSTOM
-                || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.SPAWNER_EGG
-                || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.COMMAND
-                || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.BREEDING
-                || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.TRIAL_SPAWNER
-                || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.SPAWNER
-                || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.INFECTION
-                || event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.CURED) {
-            return;
+        switch (event.getSpawnReason()) {
+            // Never cap plugin/player-driven or event-driven spawns.
+            case CUSTOM, SPAWNER_EGG, COMMAND, BREEDING, TRIAL_SPAWNER, SPAWNER, INFECTION, CURED,
+                 // Raid / village / patrol spawns must be allowed or raids break entirely.
+                 RAID, PATROL, VILLAGE_DEFENSE, VILLAGE_INVASION, REINFORCEMENTS, TRAP -> {
+                return;
+            }
+            default -> { }
         }
 
         Entity entity = event.getEntity();
         if (!(entity instanceof Monster) && !(entity instanceof Animals)) return;
         if (!isSmpWorld(entity.getWorld())) return;
+        // Never cap named or persistent mobs.
+        if (entity.isPersistent() || entity.getCustomName() != null) return;
 
         Chunk spawnChunk = entity.getLocation().getChunk();
         Player nearest = getNearestPlayer(entity);

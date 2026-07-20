@@ -1,5 +1,5 @@
 name: AspireBuildBattle
-version: '1.0.0'
+version: '26.2'
 main: com.aspireserver.buildbattle.AspireBuildBattle
 api-version: '1.21'
 description: Build Battle competitive minigame

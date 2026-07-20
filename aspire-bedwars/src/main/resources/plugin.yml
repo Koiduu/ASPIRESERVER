@@ -1,5 +1,5 @@
 name: AspireBedwars
-version: 1.0.0
+version: '26.2'
 main: com.aspireserver.bedwars.AspireBedwars
 api-version: '1.21'
 author: AspireServer

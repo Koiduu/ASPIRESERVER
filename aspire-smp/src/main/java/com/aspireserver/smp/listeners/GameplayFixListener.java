@@ -32,7 +32,9 @@ import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.potion.PotionType;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.block.Action;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.util.Vector;
 
 import java.util.List;
@@ -193,6 +195,25 @@ public class GameplayFixListener implements Listener {
         double power = 1.5 + (level * 0.5);
         player.setVelocity(direction.multiply(power));
         player.getWorld().playSound(player.getLocation(), org.bukkit.Sound.ITEM_TRIDENT_RIPTIDE_3, 1.0f, 1.0f);
+    }
+
+    // --- Fix: named mobs (name tag) must never despawn ---
+    // Applying a name tag should make the mob persistent; enforce it so named
+    // zombies/mobs don't vanish when the player walks away.
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onNameTag(PlayerInteractEntityEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND) return;
+        if (!(event.getRightClicked() instanceof LivingEntity living)) return;
+        if (living instanceof Player) return;
+        if (!isSmpWorld(living.getWorld())) return;
+        if (event.getPlayer().getInventory().getItemInMainHand().getType() != Material.NAME_TAG) return;
+
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (living.isValid() && !living.isDead() && living.getCustomName() != null) {
+                living.setRemoveWhenFarAway(false);
+                living.setPersistent(true);
+            }
+        }, 2L);
     }
 
     // --- Custom shulker recipe: obsidian chest ---

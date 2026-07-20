@@ -1,5 +1,5 @@
 name: AspireSMP
-version: '1.0.0'
+version: '26.2'
 main: com.aspireserver.smp.AspireSMP
 api-version: '1.21'
 description: SMP survival plugin with claims and one-player sleep
