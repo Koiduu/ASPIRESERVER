@@ -15,6 +15,19 @@ tier2:
   cost-material: NETHERITE_INGOT
   limit: 500
 
+# Anti-lag hostile mob cap (animals are NEVER capped, so animal/passive farms are unaffected).
+# Only natural hostile-monster spawns count; spawners, breeding, raids, named/persistent mobs
+# are always allowed. Raise per-player if mob farms feel throttled, or disable entirely.
+mob-cap:
+  enabled: true
+  per-player: 40
+
+# Keep undead (zombies, skeletons, phantoms, zoglins) from spawning near armadillos so they
+# don't roll up / get scared — lets scute farms and armadillo pens work. Radius in blocks.
+armadillo-protection:
+  enabled: true
+  radius: 12.0
+
 # One-player sleep
 one-player-sleep: true
 
