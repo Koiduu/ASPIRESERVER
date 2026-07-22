@@ -61,7 +61,8 @@ public final class AspireCreative extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PlotListener(plotManager), this);
         getServer().getPluginManager().registerEvents(new WorldEditLimiter(plotManager, this), this);
         getServer().getPluginManager().registerEvents(new CreativeRestrictionsListener(), this);
-        getServer().getPluginManager().registerEvents(new CreativeWandManager(this, plotManager), this);
+        // Custom WorldEdit tool disabled in creative worlds for now; only enabled in the "buildbattle" world (see aspire-buildbattle ProToolManager).
+        // getServer().getPluginManager().registerEvents(new CreativeWandManager(this, plotManager), this);
     }
 
     private void initPlotWorlds() {
