@@ -12,7 +12,7 @@
 
     <artifactId>aspire-smp</artifactId>
     <name>AspireSMP</name>
-    <description>SMP survival plugin with claims and graveyard</description>
+    <description>SMP survival plugin with claims and one-player sleep</description>
 
     <dependencies>
         <dependency>

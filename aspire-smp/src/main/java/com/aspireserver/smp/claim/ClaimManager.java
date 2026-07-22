@@ -18,10 +18,11 @@ public class ClaimManager {
     private final List<Claim> claims;
     private final Map<UUID, Integer> claimLimits;
     private final Map<UUID, Integer> claimTiers;
+    private final Map<Long, List<Claim>> chunkIndex;
 
-    private static final int DEFAULT_CLAIM_LIMIT = 150;
-    private static final int TIER_1_LIMIT = 250;
-    private static final int TIER_2_LIMIT = 500;
+    private static final int DEFAULT_CLAIM_LIMIT = 500;
+    private static final int TIER_1_LIMIT = 1500;
+    private static final int TIER_2_LIMIT = 3500;
 
     public ClaimManager(AspireSMP plugin) {
         this.plugin = plugin;
@@ -29,6 +30,7 @@ public class ClaimManager {
         this.claims = new ArrayList<>();
         this.claimLimits = new HashMap<>();
         this.claimTiers = new HashMap<>();
+        this.chunkIndex = new HashMap<>();
         loadClaims();
     }
 
@@ -61,6 +63,7 @@ public class ClaimManager {
                 claim.addTrusted(UUID.fromString(t));
             }
             claims.add(claim);
+            indexClaim(claim);
         }
 
         ConfigurationSection tiers = claimsConfig.getConfigurationSection("tiers");
@@ -128,6 +131,7 @@ public class ClaimManager {
 
         Claim claim = new Claim(owner, world, realMinX, realMinZ, realMaxX, realMaxZ);
         claims.add(claim);
+        indexClaim(claim);
         saveAllClaims();
         return true;
     }
@@ -142,6 +146,7 @@ public class ClaimManager {
         }
         if (toRemove != null) {
             claims.remove(toRemove);
+            deindexClaim(toRemove);
             saveAllClaims();
             return true;
         }
@@ -149,7 +154,10 @@ public class ClaimManager {
     }
 
     public Claim getClaimAt(Location location) {
-        for (Claim claim : claims) {
+        long key = chunkKey(location.getBlockX() >> 4, location.getBlockZ() >> 4);
+        List<Claim> candidates = chunkIndex.get(key);
+        if (candidates == null) return null;
+        for (Claim claim : candidates) {
             if (claim.contains(location)) {
                 return claim;
             }
@@ -214,5 +222,37 @@ public class ClaimManager {
 
     public List<Claim> getAllClaims() {
         return Collections.unmodifiableList(claims);
+    }
+
+    private void indexClaim(Claim claim) {
+        int minCX = claim.getMinX() >> 4;
+        int maxCX = claim.getMaxX() >> 4;
+        int minCZ = claim.getMinZ() >> 4;
+        int maxCZ = claim.getMaxZ() >> 4;
+        for (int cx = minCX; cx <= maxCX; cx++) {
+            for (int cz = minCZ; cz <= maxCZ; cz++) {
+                chunkIndex.computeIfAbsent(chunkKey(cx, cz), k -> new ArrayList<>()).add(claim);
+            }
+        }
+    }
+
+    private void deindexClaim(Claim claim) {
+        int minCX = claim.getMinX() >> 4;
+        int maxCX = claim.getMaxX() >> 4;
+        int minCZ = claim.getMinZ() >> 4;
+        int maxCZ = claim.getMaxZ() >> 4;
+        for (int cx = minCX; cx <= maxCX; cx++) {
+            for (int cz = minCZ; cz <= maxCZ; cz++) {
+                List<Claim> list = chunkIndex.get(chunkKey(cx, cz));
+                if (list != null) {
+                    list.remove(claim);
+                    if (list.isEmpty()) chunkIndex.remove(chunkKey(cx, cz));
+                }
+            }
+        }
+    }
+
+    private static long chunkKey(int cx, int cz) {
+        return ((long) cx << 32) | (cz & 0xFFFFFFFFL);
     }
 }

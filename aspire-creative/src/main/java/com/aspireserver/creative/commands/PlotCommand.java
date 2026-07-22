@@ -18,6 +18,7 @@ import org.bukkit.Material;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import java.util.UUID;
 
 public class PlotCommand implements CommandExecutor, TabCompleter {
 
@@ -54,6 +55,13 @@ public class PlotCommand implements CommandExecutor, TabCompleter {
                 handleClaim(player, tier);
             }
             case "home", "tp" -> handleTeleport(player, args);
+            case "visit" -> {
+                if (args.length < 2) {
+                    player.sendMessage(Component.text("Usage: /plot visit <player>", NamedTextColor.RED));
+                    return true;
+                }
+                handleVisit(player, args[1]);
+            }
             case "clear" -> handleClear(player);
             case "dispose", "delete" -> handleDispose(player);
             case "add" -> {
@@ -141,40 +149,99 @@ public class PlotCommand implements CommandExecutor, TabCompleter {
         player.sendMessage(Component.text("Plot disposed and cleared.", NamedTextColor.GREEN));
     }
 
+    private void handleVisit(Player player, String targetName) {
+        Player target = Bukkit.getPlayer(targetName);
+        UUID targetUUID;
+        String displayName;
+        if (target != null) {
+            targetUUID = target.getUniqueId();
+            displayName = target.getName();
+        } else {
+            var offline = Bukkit.getOfflinePlayer(targetName);
+            if (!offline.hasPlayedBefore()) {
+                player.sendMessage(Component.text("Player not found!", NamedTextColor.RED));
+                return;
+            }
+            targetUUID = offline.getUniqueId();
+            displayName = offline.getName() != null ? offline.getName() : targetName;
+        }
+
+        List<CreativePlot> targetPlots = plotManager.getPlayerPlots(targetUUID);
+        if (targetPlots.isEmpty()) {
+            player.sendMessage(Component.text(displayName + " has no plots!", NamedTextColor.RED));
+            return;
+        }
+
+        CreativePlot plot = targetPlots.get(0);
+        if (plot.getSpawnLocation() != null) {
+            player.teleport(plot.getSpawnLocation());
+            player.sendMessage(Component.text("Visiting " + displayName + "'s plot!", NamedTextColor.GREEN));
+        }
+    }
+
     private void handleAddMember(Player player, String targetName) {
+        // Try the plot they're standing on first, then fall back to their first plot
         CreativePlot plot = plotManager.getPlotAt(player.getLocation());
         if (plot == null || !plot.getOwner().equals(player.getUniqueId())) {
-            player.sendMessage(Component.text("You must be standing on a plot you own!", NamedTextColor.RED));
-            return;
+            List<CreativePlot> owned = plotManager.getPlayerPlots(player.getUniqueId());
+            if (owned.isEmpty()) {
+                player.sendMessage(Component.text("You don't own any plots!", NamedTextColor.RED));
+                return;
+            }
+            plot = owned.get(0);
         }
 
         Player target = Bukkit.getPlayer(targetName);
-        if (target == null) {
-            player.sendMessage(Component.text("Player not found!", NamedTextColor.RED));
-            return;
+        UUID targetUUID;
+        String displayName;
+        if (target != null) {
+            targetUUID = target.getUniqueId();
+            displayName = target.getName();
+        } else {
+            var offline = Bukkit.getOfflinePlayer(targetName);
+            if (!offline.hasPlayedBefore()) {
+                player.sendMessage(Component.text("Player not found!", NamedTextColor.RED));
+                return;
+            }
+            targetUUID = offline.getUniqueId();
+            displayName = offline.getName() != null ? offline.getName() : targetName;
         }
 
-        plot.addMember(target.getUniqueId());
+        plot.addMember(targetUUID);
         plotManager.savePlots();
-        player.sendMessage(Component.text("Added " + target.getName() + " to your plot!", NamedTextColor.GREEN));
+        player.sendMessage(Component.text("Added " + displayName + " to your plot!", NamedTextColor.GREEN));
     }
 
     private void handleRemoveMember(Player player, String targetName) {
         CreativePlot plot = plotManager.getPlotAt(player.getLocation());
         if (plot == null || !plot.getOwner().equals(player.getUniqueId())) {
-            player.sendMessage(Component.text("You must be standing on a plot you own!", NamedTextColor.RED));
-            return;
+            List<CreativePlot> owned = plotManager.getPlayerPlots(player.getUniqueId());
+            if (owned.isEmpty()) {
+                player.sendMessage(Component.text("You don't own any plots!", NamedTextColor.RED));
+                return;
+            }
+            plot = owned.get(0);
         }
 
         Player target = Bukkit.getPlayer(targetName);
-        if (target == null) {
-            player.sendMessage(Component.text("Player not found!", NamedTextColor.RED));
-            return;
+        UUID targetUUID;
+        String displayName;
+        if (target != null) {
+            targetUUID = target.getUniqueId();
+            displayName = target.getName();
+        } else {
+            var offline = Bukkit.getOfflinePlayer(targetName);
+            if (!offline.hasPlayedBefore()) {
+                player.sendMessage(Component.text("Player not found!", NamedTextColor.RED));
+                return;
+            }
+            targetUUID = offline.getUniqueId();
+            displayName = offline.getName() != null ? offline.getName() : targetName;
         }
 
-        plot.removeMember(target.getUniqueId());
+        plot.removeMember(targetUUID);
         plotManager.savePlots();
-        player.sendMessage(Component.text("Removed " + target.getName() + " from your plot.", NamedTextColor.GREEN));
+        player.sendMessage(Component.text("Removed " + displayName + " from your plot.", NamedTextColor.GREEN));
     }
 
     private void handleList(Player player) {
@@ -242,14 +309,14 @@ public class PlotCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         if (args.length == 1) {
-            return List.of("claim", "home", "clear", "dispose", "add", "remove", "list", "info").stream()
+            return List.of("claim", "home", "visit", "clear", "dispose", "add", "remove", "list", "info").stream()
                 .filter(s -> s.startsWith(args[0].toLowerCase())).toList();
         }
         if (args.length == 2 && args[0].equalsIgnoreCase("claim")) {
             return List.of("small", "medium", "large").stream()
                 .filter(s -> s.startsWith(args[1].toLowerCase())).toList();
         }
-        if (args.length == 2 && (args[0].equalsIgnoreCase("add") || args[0].equalsIgnoreCase("remove"))) {
+        if (args.length == 2 && (args[0].equalsIgnoreCase("add") || args[0].equalsIgnoreCase("remove") || args[0].equalsIgnoreCase("visit"))) {
             return Bukkit.getOnlinePlayers().stream()
                 .map(Player::getName)
                 .filter(n -> n.toLowerCase().startsWith(args[1].toLowerCase())).toList();

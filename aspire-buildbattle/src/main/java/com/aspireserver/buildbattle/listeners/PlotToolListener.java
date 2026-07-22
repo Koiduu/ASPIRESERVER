@@ -36,6 +36,14 @@ public class PlotToolListener implements Listener {
         ItemStack item = player.getInventory().getItemInMainHand();
         if (item.getType() != Material.CARROT) return;
 
+        // Only allow plot tool in lobby worlds — not in SMP
+        String smpWorld = "";
+        var smpPlugin = org.bukkit.Bukkit.getPluginManager().getPlugin("AspireSMP");
+        if (smpPlugin != null && smpPlugin.isEnabled()) {
+            smpWorld = smpPlugin.getConfig().getString("smp-world", "");
+        }
+        if (!smpWorld.isEmpty() && player.getWorld().getName().equalsIgnoreCase(smpWorld)) return;
+
         if (event.getAction() == Action.LEFT_CLICK_BLOCK && event.getClickedBlock() != null) {
             event.setCancelled(true);
             Location loc = event.getClickedBlock().getLocation();

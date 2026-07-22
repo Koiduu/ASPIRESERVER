@@ -1,0 +1,20 @@
+name: AspireDuelBot
+version: '26.2'
+main: com.aspireserver.duelbot.DuelBotPlugin
+api-version: '1.21'
+author: AspireServer
+description: Citizens2-driven 1.8-style PvP practice bot for the duels world.
+depend: [Citizens]
+commands:
+  duelbot:
+    description: Spawn and manage PvP duel bots.
+    usage: /duelbot spawn|remove|removeall|tier|blocks|info|reload
+    permission: duelbot.admin
+  botkit:
+    description: Open the nearest duel bot's inventory to edit its kit.
+    usage: /botkit
+    permission: duelbot.admin
+permissions:
+  duelbot.admin:
+    description: Manage duel bots.
+    default: op

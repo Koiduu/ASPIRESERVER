@@ -1,0 +1,45 @@
+# Difficulty tiers (Section 5 schema). Angles in degrees, times in ticks (20/sec).
+# These are tuning defaults, not measured truth — adjust after live testing.
+default-tier: MEDIUM
+
+difficulty:
+  EASY:
+    reach: 2.8
+    cps: { mean: 4.5, stddev: 1.5 }
+    aim: { offset0: 8.0, tau: 6 }
+    crit_consistency: 0.20
+    wtap_reliability: 0.10
+    wtap_ticks: 1
+    strafe: { min_ticks: 15, max_ticks: 30, weight: 0.6, forward_weight: 1.0 }
+    reaction_delay_ticks: { min: 8, max: 12 }
+    block_place_delay_ticks: 10
+  MEDIUM:
+    reach: 2.9
+    cps: { mean: 7.0, stddev: 1.2 }
+    aim: { offset0: 4.0, tau: 4 }
+    crit_consistency: 0.50
+    wtap_reliability: 0.40
+    wtap_ticks: 1
+    strafe: { min_ticks: 10, max_ticks: 20, weight: 0.75, forward_weight: 1.0 }
+    reaction_delay_ticks: { min: 5, max: 8 }
+    block_place_delay_ticks: 6
+  HARD:
+    reach: 2.95
+    cps: { mean: 10.0, stddev: 0.8 }
+    aim: { offset0: 2.0, tau: 2 }
+    crit_consistency: 0.80
+    wtap_reliability: 0.80
+    wtap_ticks: 1
+    strafe: { min_ticks: 6, max_ticks: 14, weight: 0.9, forward_weight: 1.0 }
+    reaction_delay_ticks: { min: 2, max: 4 }
+    block_place_delay_ticks: 3
+  HACKER:
+    reach: 3.0
+    cps: { mean: 14.0, stddev: 0.2 }
+    aim: { offset0: 0.3, tau: 0.5 }
+    crit_consistency: 0.98
+    wtap_reliability: 0.99
+    wtap_ticks: 1
+    strafe: { min_ticks: 4, max_ticks: 8, weight: 1.0, forward_weight: 1.0 }
+    reaction_delay_ticks: { min: 0, max: 1 }
+    block_place_delay_ticks: 1

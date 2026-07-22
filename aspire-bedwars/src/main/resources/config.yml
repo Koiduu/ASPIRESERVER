@@ -1,0 +1,66 @@
+# AspireBedwars configuration
+# All gameplay is isolated to this world.
+world-name: bedwars
+
+# Lobby / match sizing
+min-players: 2
+max-teams: 8
+team-size: 1
+lobby-countdown: 20
+
+# Respawn
+respawn-seconds: 5
+respawn-invuln-seconds: 4
+disconnect-grace-seconds: 60
+
+# Combat
+sharpness-cap: 3
+
+# Generator / game timeline (minutes). Cadence defaults to 6/6/6/10/10.
+timeline:
+  diamond-tier2-min: 6      # Diamond/Emerald -> Tier II
+  diamond-tier3-min: 6      # +minutes later -> Tier III (max)
+  bed-destruction-min: 6    # +minutes later -> all beds auto-destroyed
+  sudden-death-min: 10      # +minutes later -> Sudden Death (dragons)
+  game-over-min: 10         # +minutes later -> hard cutoff, declare winner
+
+# Base generator intervals (ticks) at tier 1
+generators:
+  iron-interval-ticks: 15
+  gold-interval-ticks: 70
+  diamond-interval-ticks: 600
+  emerald-interval-ticks: 800
+
+# Custom starting loadout, given on every (re)spawn in addition to armor/tools.
+# Remove/edit entries to change the default kit. Defaults to a single wooden sword.
+loadout:
+  - material: WOODEN_SWORD
+    amount: 1
+    unbreakable: true
+
+# Preferred hotbar slots (0-8) for purchased/kept gear. Applied on purchase AND respawn,
+# so tools always land in the same spot without manual rearranging.
+# Set a value to -1 to just use the first free slot instead.
+hotbar-slots:
+  sword: 0
+  pickaxe: 7
+  axe: 6
+  shears: 8
+
+# Custom shop profile (optional).
+#   custom-items: adds plain "give" entries, or overrides an existing id.
+#   quick-buy:    replaces the default Quick Buy tab (ids must exist in the catalog).
+# Both are optional — leaving this out keeps the built-in catalog and quick buy.
+shop:
+  custom-items: []
+  #  - id: emerald_block
+  #    category: BLOCKS        # QUICK_BUY, BLOCKS, MELEE, ARMOR, TOOLS, RANGED, POTIONS, UTILITY
+  #    name: "Emerald Block"
+  #    icon: EMERALD_BLOCK
+  #    amount: 1
+  #    cost-material: EMERALD
+  #    cost-amount: 4
+  quick-buy: []
+  #  - wool
+  #  - stone_sword
+  #  - arrow

@@ -1,5 +1,5 @@
 name: AspireCore
-version: '1.0.0'
+version: '26.2'
 main: com.aspireserver.core.AspireCore
 api-version: '1.21'
 description: Core network module for Aspire Server
@@ -27,6 +27,10 @@ commands:
   l:
     description: Lobby alias
     usage: /l
+  setlobby:
+    description: Set the lobby spawn to your current location
+    usage: /setlobby
+    permission: aspire.admin.setlobby
   ban:
     description: Ban a player
     usage: /ban <player> <reason>
@@ -55,6 +59,24 @@ commands:
     description: NPC management
     usage: /npc <create|edit|remove|movehere|list>
     permission: aspire.admin.npc
+  flyspeed:
+    description: Change fly speed
+    usage: /flyspeed <1-5>
+  loadout:
+    description: Save and load inventory loadouts
+    usage: /loadout <save|load|delete|list|auto> [name]
+  rankgive:
+    description: Give a player a rank (GUI)
+    usage: /rankgive <player>
+    permission: aspire.admin.rank
+  nick:
+    description: Set your nickname (ops only)
+    usage: /nick <name|reset>
+    permission: aspire.admin.nick
+  titlegive:
+    description: Give a Build Battle title (GUI)
+    usage: /titlegive <player> [title]
+    permission: aspire.admin.title
 
 permissions:
   aspire.admin.ban:
@@ -80,4 +102,16 @@ permissions:
     default: op
   aspire.admin.npc:
     description: NPC management
+    default: op
+  aspire.admin.setlobby:
+    description: Set lobby spawn location
+    default: op
+  aspire.admin.rank:
+    description: Give ranks to players
+    default: op
+  aspire.admin.nick:
+    description: Set nickname
+    default: op
+  aspire.admin.title:
+    description: Give Build Battle titles
     default: op

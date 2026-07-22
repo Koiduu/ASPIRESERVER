@@ -17,6 +17,9 @@
         <module>aspire-buildbattle</module>
         <module>aspire-smp</module>
         <module>aspire-creative</module>
+        <module>aspire-chameleon</module>
+        <module>aspire-bedwars</module>
+        <module>aspire-duelbot</module>
     </modules>
 
     <properties>
@@ -41,6 +44,10 @@
         <repository>
             <id>sonatype-snapshots</id>
             <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+        </repository>
+        <repository>
+            <id>citizens</id>
+            <url>https://repo.citizensnpcs.co/</url>
         </repository>
     </repositories>
 

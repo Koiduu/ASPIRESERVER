@@ -1,0 +1,15 @@
+name: MecchaChameleon
+version: '26.2'
+main: com.aspireserver.chameleon.MecchaChameleon
+api-version: '1.21'
+description: Meccha Chameleon hide-and-seek mini-game
+authors: [AspireServer]
+commands:
+  chameleon:
+    description: MecchaChameleon admin commands
+    usage: /chameleon <subcommand>
+    aliases: [cham, meccha]
+permissions:
+  chameleon.admin:
+    description: Admin access to MecchaChameleon
+    default: op

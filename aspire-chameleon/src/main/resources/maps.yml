@@ -1,0 +1,6 @@
+# MecchaChameleon Maps Configuration
+# Use /chameleon map create <name> to add maps
+# Use /chameleon map addhiderspawn <map> to add hider spawn points
+# Use /chameleon map setseekerspawn <map> to set seeker spawn
+# Use /chameleon map addskin <map> <name> <uuid> to add skins
+maps: {}

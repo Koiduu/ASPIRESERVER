@@ -1,8 +1,8 @@
 name: AspireSMP
-version: '1.0.0'
+version: '26.2'
 main: com.aspireserver.smp.AspireSMP
 api-version: '1.21'
-description: SMP survival plugin with claims, graveyard, and one-player sleep
+description: SMP survival plugin with claims and one-player sleep
 author: Aspire Team
 depend: [AspireCore]
 
@@ -19,8 +19,24 @@ commands:
   upgradeland:
     description: Open land upgrade GUI
     usage: /upgradeland
+  smpworld:
+    description: Set the SMP world
+    usage: /smpworld <worldName>
+    permission: aspire.admin.smp
+  trade:
+    description: Trade items safely with another player
+    usage: /trade <player|accept|deny>
+  team:
+    description: Team management
+    usage: /team <create|invite|accept|leave|kick|chat|info|disband>
+  shop:
+    description: Player shop
+    usage: /shop [sell|buy|my|cancel]
 
 permissions:
+  aspire.admin.smp:
+    description: SMP admin commands
+    default: op
   aspire.smp.claim:
     description: Allows claiming land
     default: true

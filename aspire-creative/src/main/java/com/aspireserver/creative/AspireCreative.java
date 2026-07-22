@@ -1,7 +1,10 @@
 package com.aspireserver.creative;
 
+import com.aspireserver.creative.commands.CreativeWorldCommand;
 import com.aspireserver.creative.commands.PlotCommand;
 import com.aspireserver.creative.generator.FlatPlotGenerator;
+import com.aspireserver.creative.listeners.CreativeRestrictionsListener;
+import com.aspireserver.creative.listeners.CreativeWandManager;
 import com.aspireserver.creative.listeners.PlotListener;
 import com.aspireserver.creative.listeners.WorldEditLimiter;
 import com.aspireserver.creative.plot.PlotManager;
@@ -9,6 +12,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitRunnable;
 
 public final class AspireCreative extends JavaPlugin {
 
@@ -25,7 +29,14 @@ public final class AspireCreative extends JavaPlugin {
 
         registerCommands();
         registerListeners();
-        initPlotWorlds();
+
+        // Delay world initialization until server is fully loaded
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                initPlotWorlds();
+            }
+        }.runTaskLater(this, 40L);
 
         getLogger().info("[AspireCreative] Plugin enabled!");
     }
@@ -40,11 +51,18 @@ public final class AspireCreative extends JavaPlugin {
         PlotCommand plotCmd = new PlotCommand(plotManager);
         getCommand("plot").setExecutor(plotCmd);
         getCommand("plot").setTabCompleter(plotCmd);
+
+        CreativeWorldCommand cwCmd = new CreativeWorldCommand(this);
+        getCommand("creativeworld").setExecutor(cwCmd);
+        getCommand("creativeworld").setTabCompleter(cwCmd);
     }
 
     private void registerListeners() {
         getServer().getPluginManager().registerEvents(new PlotListener(plotManager), this);
         getServer().getPluginManager().registerEvents(new WorldEditLimiter(plotManager, this), this);
+        getServer().getPluginManager().registerEvents(new CreativeRestrictionsListener(), this);
+        // Custom WorldEdit tool disabled in creative worlds for now; only enabled in the "buildbattle" world (see aspire-buildbattle ProToolManager).
+        // getServer().getPluginManager().registerEvents(new CreativeWandManager(this, plotManager), this);
     }
 
     private void initPlotWorlds() {

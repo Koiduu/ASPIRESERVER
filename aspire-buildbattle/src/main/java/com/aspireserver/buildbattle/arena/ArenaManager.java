@@ -23,7 +23,7 @@ public class ArenaManager {
     private final Map<String, Arena> arenas;
     private final Map<UUID, GameSession> playerSessions;
     private final List<GameSession> activeSessions;
-    private Location waitingLobby;
+    private final Map<String, Location> waitingLobbies;
     private File arenasFile;
     private FileConfiguration arenasConfig;
 
@@ -32,6 +32,7 @@ public class ArenaManager {
         this.arenas = new HashMap<>();
         this.playerSessions = new ConcurrentHashMap<>();
         this.activeSessions = Collections.synchronizedList(new ArrayList<>());
+        this.waitingLobbies = new HashMap<>();
     }
 
     public void loadArenas() {
@@ -77,27 +78,52 @@ public class ArenaManager {
             arenas.put(id, arena);
         }
 
-        loadWaitingLobby();
+        loadWaitingLobbies();
         plugin.getLogger().info("Loaded " + arenas.size() + " arena(s).");
     }
 
-    public void loadWaitingLobby() {
-        String worldName = plugin.getConfig().getString("waiting-lobby.world");
-        if (worldName != null) {
-            World world = Bukkit.getWorld(worldName);
-            if (world != null) {
-                double x = plugin.getConfig().getDouble("waiting-lobby.x");
-                double y = plugin.getConfig().getDouble("waiting-lobby.y");
-                double z = plugin.getConfig().getDouble("waiting-lobby.z");
-                float yaw = (float) plugin.getConfig().getDouble("waiting-lobby.yaw", 0);
-                float pitch = (float) plugin.getConfig().getDouble("waiting-lobby.pitch", 0);
-                waitingLobby = new Location(world, x, y, z, yaw, pitch);
+    public void loadWaitingLobbies() {
+        waitingLobbies.clear();
+        for (String key : new String[]{"global", "solo", "teams", "pro"}) {
+            String path = "waiting-lobby." + key;
+            String worldName = plugin.getConfig().getString(path + ".world");
+            if (worldName != null) {
+                World world = Bukkit.getWorld(worldName);
+                if (world != null) {
+                    double x = plugin.getConfig().getDouble(path + ".x");
+                    double y = plugin.getConfig().getDouble(path + ".y");
+                    double z = plugin.getConfig().getDouble(path + ".z");
+                    float yaw = (float) plugin.getConfig().getDouble(path + ".yaw", 0);
+                    float pitch = (float) plugin.getConfig().getDouble(path + ".pitch", 0);
+                    waitingLobbies.put(key, new Location(world, x, y, z, yaw, pitch));
+                }
+            }
+        }
+        // Backward compat: load old single waiting-lobby format into global
+        if (!waitingLobbies.containsKey("global")) {
+            String worldName = plugin.getConfig().getString("waiting-lobby.world");
+            if (worldName != null) {
+                World world = Bukkit.getWorld(worldName);
+                if (world != null) {
+                    double x = plugin.getConfig().getDouble("waiting-lobby.x");
+                    double y = plugin.getConfig().getDouble("waiting-lobby.y");
+                    double z = plugin.getConfig().getDouble("waiting-lobby.z");
+                    float yaw = (float) plugin.getConfig().getDouble("waiting-lobby.yaw", 0);
+                    float pitch = (float) plugin.getConfig().getDouble("waiting-lobby.pitch", 0);
+                    waitingLobbies.put("global", new Location(world, x, y, z, yaw, pitch));
+                }
             }
         }
     }
 
     public Location getWaitingLobby() {
-        return waitingLobby;
+        return waitingLobbies.getOrDefault("global", null);
+    }
+
+    public Location getWaitingLobby(String plotType) {
+        Location lobby = waitingLobbies.get(plotType);
+        if (lobby != null) return lobby;
+        return waitingLobbies.getOrDefault("global", null);
     }
 
     public void saveArena(Arena arena) {
@@ -184,6 +210,10 @@ public class ArenaManager {
 
     public GameSession getPlayerSession(UUID player) {
         return playerSessions.get(player);
+    }
+
+    public void removePlayerTracking(UUID player) {
+        playerSessions.remove(player);
     }
 
     public void releaseArena(Arena arena) {

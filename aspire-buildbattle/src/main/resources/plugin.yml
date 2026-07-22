@@ -1,5 +1,5 @@
 name: AspireBuildBattle
-version: '1.0.0'
+version: '26.2'
 main: com.aspireserver.buildbattle.AspireBuildBattle
 api-version: '1.21'
 description: Build Battle competitive minigame
@@ -19,8 +19,12 @@ commands:
     usage: /plotset <arenaId>
     permission: aspire.buildbattle.admin
   spawnsetwaiting:
-    description: Set the waiting lobby spawn
+    description: Set the waiting lobby spawn (global)
     usage: /spawnsetwaiting
+    permission: aspire.buildbattle.admin
+  spawnwaiting:
+    description: Set mode-specific waiting lobby
+    usage: /spawnwaiting [solo|teams|pro]
     permission: aspire.buildbattle.admin
   togglesolo:
     description: Toggle plot creation to solo mode

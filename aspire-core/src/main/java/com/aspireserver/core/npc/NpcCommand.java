@@ -76,6 +76,20 @@ public class NpcCommand implements CommandExecutor, TabCompleter {
                 }
                 handleMoveHere(player, args[1]);
             }
+            case "setcmd" -> {
+                if (args.length < 3) {
+                    MessageUtil.sendError(player, "Usage: /npc setcmd <id> <command without />)");
+                    return true;
+                }
+                handleSetCmd(player, args[1], String.join(" ", Arrays.copyOfRange(args, 2, args.length)));
+            }
+            case "setskin" -> {
+                if (args.length < 3) {
+                    MessageUtil.sendError(player, "Usage: /npc setskin <id> <playerName>");
+                    return true;
+                }
+                handleSetSkin(player, args[1], args[2]);
+            }
             default -> sendUsage(player);
         }
         return true;
@@ -117,7 +131,9 @@ public class NpcCommand implements CommandExecutor, TabCompleter {
                 case BUILD_BATTLE_PRO_TEAMS -> Material.NETHERITE_SWORD;
                 case WARP_SMP -> Material.GRASS_BLOCK;
                 case WARP_CREATIVE -> Material.CRAFTING_TABLE;
+                case WARP_CHAMELEON -> Material.LIME_DYE;
                 case WARP_LOBBY -> Material.COMPASS;
+                case CUSTOM_COMMAND -> Material.COMMAND_BLOCK;
             };
 
             ItemStack item = new ItemStack(mat);
@@ -163,26 +179,58 @@ public class NpcCommand implements CommandExecutor, TabCompleter {
         MessageUtil.sendSuccess(player, "NPC moved to your location.");
     }
 
+    private void handleSetCmd(Player player, String id, String cmd) {
+        NpcData npc = npcManager.getNpc(id);
+        if (npc == null) {
+            MessageUtil.sendError(player, "NPC not found!");
+            return;
+        }
+        npc.setAction(NpcAction.CUSTOM_COMMAND);
+        npc.setCustomCommand(cmd);
+        npcManager.saveNpcs();
+        MessageUtil.sendSuccess(player, "NPC '" + id + "' will now run: /" + cmd);
+    }
+
+    private void handleSetSkin(Player player, String id, String skinName) {
+        NpcData npc = npcManager.getNpc(id);
+        if (npc == null) {
+            MessageUtil.sendError(player, "NPC not found!");
+            return;
+        }
+        npc.setSkinName(skinName);
+        npcManager.saveNpcs();
+        npcManager.spawnNpc(npc);
+        MessageUtil.sendSuccess(player, "NPC '" + id + "' skin set to: " + skinName + ". Player head will display above the NPC.");
+    }
+
     private void sendUsage(Player player) {
         MessageUtil.sendInfo(player, "--- NPC Commands ---");
         MessageUtil.send(player, "/npc create <id> <name> - Create NPC at your location");
         MessageUtil.send(player, "/npc edit <id> - Open action selector GUI");
         MessageUtil.send(player, "/npc remove <id> - Remove NPC");
         MessageUtil.send(player, "/npc movehere <id> - Move NPC to your position");
+        MessageUtil.send(player, "/npc setcmd <id> <command> - Set custom command (no /)");
+        MessageUtil.send(player, "/npc setskin <id> <playerName> - Set NPC skin to a player");
         MessageUtil.send(player, "/npc list - List all NPCs");
     }
 
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         if (args.length == 1) {
-            return List.of("create", "edit", "remove", "movehere", "list").stream()
+            return List.of("create", "edit", "remove", "movehere", "setcmd", "setskin", "list").stream()
                 .filter(s -> s.startsWith(args[0].toLowerCase())).toList();
         }
         if (args.length == 2 && (args[0].equalsIgnoreCase("edit") || args[0].equalsIgnoreCase("remove")
-            || args[0].equalsIgnoreCase("movehere"))) {
+            || args[0].equalsIgnoreCase("movehere") || args[0].equalsIgnoreCase("setcmd")
+            || args[0].equalsIgnoreCase("setskin"))) {
             return npcManager.getAllNpcs().stream()
                 .map(NpcData::getId)
                 .filter(s -> s.toLowerCase().startsWith(args[1].toLowerCase())).toList();
+        }
+        if (args.length == 3 && args[0].equalsIgnoreCase("setskin")) {
+            return Bukkit.getOnlinePlayers().stream()
+                .map(Player::getName)
+                .filter(s -> s.toLowerCase().startsWith(args[2].toLowerCase())).toList();
         }
         return List.of();
     }

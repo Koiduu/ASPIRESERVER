@@ -12,11 +12,16 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockBurnEvent;
+import org.bukkit.event.block.BlockIgniteEvent;
 import org.bukkit.event.block.BlockPhysicsEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.BlockRedstoneEvent;
+import org.bukkit.event.block.BlockSpreadEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.EntitySpawnEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
@@ -32,7 +37,7 @@ public class AntiGriefListener implements Listener {
     private static final Set<EntityType> DISALLOWED_MOBS = Set.of(
         EntityType.WARDEN, EntityType.WITHER, EntityType.ENDERMAN,
         EntityType.ENDER_DRAGON, EntityType.ELDER_GUARDIAN,
-        EntityType.RAVAGER, EntityType.VEX
+        EntityType.RAVAGER, EntityType.VEX, EntityType.WITHER_SKELETON
     );
 
     private static final int MAX_ENTITIES_PER_PLOT = 5;
@@ -150,7 +155,7 @@ public class AntiGriefListener implements Listener {
             }
         }
 
-        // Also cancel general block updates (like water flow, etc.) for source block if it's inside a plot
+        // Also cancel general block updates for source block if gravity inside plots
         if (event.getSourceBlock() != null && event.getSourceBlock().getLocation() != event.getBlock().getLocation()) {
             Material sourceType = event.getSourceBlock().getType();
             if (isGravityBlock(sourceType)) {
@@ -239,6 +244,77 @@ public class AntiGriefListener implements Listener {
             "You cannot drop items here!", net.kyori.adventure.text.format.NamedTextColor.RED));
     }
 
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onEntitySpawn(EntitySpawnEvent event) {
+        if (!(event.getEntity() instanceof FallingBlock)) return;
+        Location loc = event.getLocation();
+        for (var arena : plugin.getArenaManager().getArenas()) {
+            for (PlotRegion plot : arena.getPlots()) {
+                if (plot.contains(loc)) {
+                    event.setCancelled(true);
+                    return;
+                }
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onEntityChangeBlock(EntityChangeBlockEvent event) {
+        if (!(event.getEntity() instanceof FallingBlock)) return;
+        Location loc = event.getBlock().getLocation();
+        for (var arena : plugin.getArenaManager().getArenas()) {
+            for (PlotRegion plot : arena.getPlots()) {
+                if (plot.contains(loc)) {
+                    event.setCancelled(true);
+                    return;
+                }
+            }
+        }
+    }
+
+    // Fire spread disabled in all BB plots
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onFireSpread(BlockSpreadEvent event) {
+        if (event.getSource().getType() != Material.FIRE && event.getSource().getType() != Material.SOUL_FIRE) return;
+        Location loc = event.getBlock().getLocation();
+        for (var arena : plugin.getArenaManager().getArenas()) {
+            for (PlotRegion plot : arena.getPlots()) {
+                if (plot.contains(loc)) {
+                    event.setCancelled(true);
+                    return;
+                }
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onBlockIgnite(BlockIgniteEvent event) {
+        if (event.getCause() == BlockIgniteEvent.IgniteCause.SPREAD) {
+            Location loc = event.getBlock().getLocation();
+            for (var arena : plugin.getArenaManager().getArenas()) {
+                for (PlotRegion plot : arena.getPlots()) {
+                    if (plot.contains(loc)) {
+                        event.setCancelled(true);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onBlockBurn(BlockBurnEvent event) {
+        Location loc = event.getBlock().getLocation();
+        for (var arena : plugin.getArenaManager().getArenas()) {
+            for (PlotRegion plot : arena.getPlots()) {
+                if (plot.contains(loc)) {
+                    event.setCancelled(true);
+                    return;
+                }
+            }
+        }
+    }
+
     @EventHandler
     public void onCreatureSpawn(CreatureSpawnEvent event) {
         if (event.getSpawnReason() == CreatureSpawnEvent.SpawnReason.CUSTOM
@@ -266,6 +342,28 @@ public class AntiGriefListener implements Listener {
                             mob.setInvulnerable(true);
                             mob.setSilent(true);
                             mob.setCollidable(false);
+
+                            // Face the nearest player in the plot
+                            Player nearest = null;
+                            double nearestDist = Double.MAX_VALUE;
+                            for (Entity e : loc.getWorld().getNearbyEntities(loc, 30, 30, 30)) {
+                                if (e instanceof Player p) {
+                                    double dist = p.getLocation().distanceSquared(loc);
+                                    if (dist < nearestDist) {
+                                        nearestDist = dist;
+                                        nearest = p;
+                                    }
+                                }
+                            }
+                            if (nearest != null) {
+                                Location mobLoc = mob.getLocation();
+                                Location playerLoc = nearest.getLocation();
+                                double dx = playerLoc.getX() - mobLoc.getX();
+                                double dz = playerLoc.getZ() - mobLoc.getZ();
+                                float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+                                mobLoc.setYaw(yaw);
+                                mob.teleport(mobLoc);
+                            }
                         }
                         return;
                     }

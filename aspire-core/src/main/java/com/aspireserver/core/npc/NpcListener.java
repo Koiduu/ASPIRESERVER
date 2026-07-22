@@ -6,6 +6,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Entity;
@@ -69,24 +70,28 @@ public class NpcListener implements Listener {
         NpcAction action = npc.getAction();
         switch (action) {
             case BUILD_BATTLE_SOLO, BUILD_BATTLE_TEAMS, BUILD_BATTLE_PRO_SOLO, BUILD_BATTLE_PRO_TEAMS -> {
+                player.setGameMode(GameMode.CREATIVE);
                 if (action.getCommand() != null) {
                     player.performCommand(action.getCommand());
                 }
             }
             case WARP_SMP -> {
-                String worldName = plugin.getConfig().getString("warps.smp.world", "world");
-                double x = plugin.getConfig().getDouble("warps.smp.x", 0);
-                double y = plugin.getConfig().getDouble("warps.smp.y", 100);
-                double z = plugin.getConfig().getDouble("warps.smp.z", 0);
+                player.setGameMode(GameMode.SURVIVAL);
+                String worldName = getSmpWorldName();
                 World world = Bukkit.getWorld(worldName);
                 if (world != null) {
-                    player.teleport(new Location(world, x, y, z));
+                    double x = plugin.getConfig().getDouble("warps.smp.x", 0);
+                    double y = plugin.getConfig().getDouble("warps.smp.y", 100);
+                    double z = plugin.getConfig().getDouble("warps.smp.z", 0);
+                    Location loc = (x == 0 && z == 0) ? world.getSpawnLocation() : new Location(world, x, y, z);
+                    player.teleport(loc);
                     MessageUtil.sendSuccess(player, "Warped to SMP!");
                 } else {
-                    MessageUtil.sendError(player, "SMP world not found!");
+                    player.performCommand("mvtp " + worldName);
                 }
             }
             case WARP_CREATIVE -> {
+                player.setGameMode(GameMode.CREATIVE);
                 String worldName = plugin.getConfig().getString("warps.creative.world", "creative_small");
                 double x = plugin.getConfig().getDouble("warps.creative.x", 0);
                 double y = plugin.getConfig().getDouble("warps.creative.y", 65);
@@ -96,13 +101,49 @@ public class NpcListener implements Listener {
                     player.teleport(new Location(world, x, y, z));
                     MessageUtil.sendSuccess(player, "Warped to Creative!");
                 } else {
-                    MessageUtil.sendError(player, "Creative world not found!");
+                    player.performCommand("mvtp " + worldName);
+                }
+            }
+            case WARP_CHAMELEON -> {
+                player.setGameMode(GameMode.ADVENTURE);
+                String chameleonWorld = "chameleon";
+                var chameleonPlugin = Bukkit.getPluginManager().getPlugin("AspireChameleon");
+                if (chameleonPlugin != null && chameleonPlugin.isEnabled()) {
+                    chameleonWorld = chameleonPlugin.getConfig().getString("world-name", "chameleon");
+                }
+                World cWorld = Bukkit.getWorld(chameleonWorld);
+                if (cWorld != null) {
+                    player.teleport(cWorld.getSpawnLocation());
+                    MessageUtil.sendSuccess(player, "Warped to Chameleon!");
+                } else {
+                    player.performCommand("mvtp " + chameleonWorld);
                 }
             }
             case WARP_LOBBY -> {
                 player.performCommand("lobby");
             }
+            case CUSTOM_COMMAND -> {
+                String cmd = npc.getCustomCommand();
+                if (cmd != null && !cmd.isEmpty()) {
+                    player.performCommand(cmd);
+                } else {
+                    MessageUtil.sendError(player, "No custom command set! Use /npc setcmd <id> <command>");
+                }
+            }
         }
+    }
+
+    private String getSmpWorldName() {
+        // First try reading from aspire-smp plugin's config
+        var smpPlugin = Bukkit.getPluginManager().getPlugin("AspireSMP");
+        if (smpPlugin != null && smpPlugin.isEnabled()) {
+            String smpWorld = smpPlugin.getConfig().getString("smp-world", "");
+            if (!smpWorld.isEmpty()) {
+                return smpWorld;
+            }
+        }
+        // Fallback to core config
+        return plugin.getConfig().getString("warps.smp.world", "world");
     }
 
     @EventHandler

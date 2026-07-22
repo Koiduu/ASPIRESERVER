@@ -3,6 +3,7 @@ package com.aspireserver.buildbattle.game;
 import com.aspireserver.buildbattle.AspireBuildBattle;
 import com.aspireserver.buildbattle.arena.Arena;
 import com.aspireserver.buildbattle.plot.PlotRegion;
+import com.aspireserver.buildbattle.pro.ProToolManager;
 import com.aspireserver.buildbattle.voting.VoteManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -81,7 +82,8 @@ public class GameSession {
         players.add(player);
         Player p = Bukkit.getPlayer(player);
         if (p != null) {
-            Location waitingLobby = plugin.getArenaManager().getWaitingLobby();
+            String plotType = arena.getPlotType();
+            Location waitingLobby = plugin.getArenaManager().getWaitingLobby(plotType);
             if (waitingLobby != null) {
                 p.teleport(waitingLobby);
             }
@@ -344,6 +346,10 @@ public class GameSession {
                 ));
                 star.setItemMeta(meta);
                 player.getInventory().setItem(8, star);
+
+                if (gameMode.isWorldEditEnabled()) {
+                    player.getInventory().setItem(7, ProToolManager.createProToolItem());
+                }
             }
         }
     }
@@ -502,33 +508,80 @@ public class GameSession {
             }
         }
 
-        UUID winner = null;
         int highestScore = -1;
         for (Map.Entry<UUID, Integer> entry : scores.entrySet()) {
             if (entry.getValue() > highestScore) {
                 highestScore = entry.getValue();
-                winner = entry.getKey();
+            }
+        }
+
+        List<UUID> winners = new ArrayList<>();
+        for (Map.Entry<UUID, Integer> entry : scores.entrySet()) {
+            if (entry.getValue() == highestScore) {
+                winners.add(entry.getKey());
+            }
+        }
+
+        boolean isTie = winners.size() > 1;
+
+        // Warp all players to the first winner's plot for viewing
+        if (!winners.isEmpty()) {
+            Integer winnerPlotIdx = playerPlotAssignments.get(winners.get(0));
+            if (winnerPlotIdx != null && winnerPlotIdx < arena.getPlots().size()) {
+                Location plotCenter = arena.getPlots().get(winnerPlotIdx).getCenter();
+                for (UUID uuid : players) {
+                    Player player = Bukkit.getPlayer(uuid);
+                    if (player != null) {
+                        player.teleport(plotCenter);
+                    }
+                }
             }
         }
 
         for (UUID uuid : players) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
-                if (uuid.equals(winner)) {
-                    player.showTitle(Title.title(
-                        Component.text("WINNER!", NamedTextColor.GOLD),
-                        Component.text("Score: " + highestScore, NamedTextColor.YELLOW),
-                        Title.Times.times(Duration.ofMillis(500), Duration.ofSeconds(5), Duration.ofMillis(500))
-                    ));
-                    player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
-                } else {
-                    Player winnerPlayer = winner != null ? Bukkit.getPlayer(winner) : null;
-                    String winnerName = winnerPlayer != null ? winnerPlayer.getName() : "Unknown";
-                    player.showTitle(Title.title(
-                        Component.text(winnerName + " wins!", NamedTextColor.GREEN),
-                        Component.text("Score: " + highestScore, NamedTextColor.GRAY),
-                        Title.Times.times(Duration.ofMillis(500), Duration.ofSeconds(5), Duration.ofMillis(500))
-                    ));
+                if (isTie) {
+                    StringBuilder tiedNames = new StringBuilder();
+                    for (int i = 0; i < winners.size(); i++) {
+                        Player wp = Bukkit.getPlayer(winners.get(i));
+                        if (wp != null) {
+                            if (tiedNames.length() > 0) tiedNames.append(", ");
+                            tiedNames.append(wp.getName());
+                        }
+                    }
+                    if (winners.contains(uuid)) {
+                        player.showTitle(Title.title(
+                            Component.text("TIE!", NamedTextColor.GOLD),
+                            Component.text("Score: " + highestScore + " | " + tiedNames, NamedTextColor.YELLOW),
+                            Title.Times.times(Duration.ofMillis(500), Duration.ofSeconds(5), Duration.ofMillis(500))
+                        ));
+                        player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
+                    } else {
+                        player.showTitle(Title.title(
+                            Component.text("It's a TIE!", NamedTextColor.GREEN),
+                            Component.text(tiedNames + " | Score: " + highestScore, NamedTextColor.GRAY),
+                            Title.Times.times(Duration.ofMillis(500), Duration.ofSeconds(5), Duration.ofMillis(500))
+                        ));
+                    }
+                } else if (!winners.isEmpty()) {
+                    UUID winner = winners.get(0);
+                    if (uuid.equals(winner)) {
+                        player.showTitle(Title.title(
+                            Component.text("WINNER!", NamedTextColor.GOLD),
+                            Component.text("Score: " + highestScore, NamedTextColor.YELLOW),
+                            Title.Times.times(Duration.ofMillis(500), Duration.ofSeconds(5), Duration.ofMillis(500))
+                        ));
+                        player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
+                    } else {
+                        Player winnerPlayer = Bukkit.getPlayer(winner);
+                        String winnerName = winnerPlayer != null ? winnerPlayer.getName() : "Unknown";
+                        player.showTitle(Title.title(
+                            Component.text(winnerName + " wins!", NamedTextColor.GREEN),
+                            Component.text("Score: " + highestScore, NamedTextColor.GRAY),
+                            Title.Times.times(Duration.ofMillis(500), Duration.ofSeconds(5), Duration.ofMillis(500))
+                        ));
+                    }
                 }
             }
         }
@@ -536,8 +589,21 @@ public class GameSession {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             clearAllPlots();
             resetFloors();
+            warpToLobbyAndLeave();
             resetSession();
         }, 100L);
+    }
+
+    private void warpToLobbyAndLeave() {
+        // Warp all players to lobby and fully remove them from BB
+        for (UUID uuid : new HashSet<>(players)) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                // Try /lobby command location first, fall back to arena lobby
+                player.performCommand("lobby");
+                player.sendMessage(Component.text("Game over! Returned to lobby.", NamedTextColor.GREEN));
+            }
+        }
     }
 
     public void forceEnd() {
@@ -581,11 +647,9 @@ public class GameSession {
     }
 
     private void resetSession() {
+        // Remove all players from ArenaManager's session tracking
         for (UUID uuid : players) {
-            Player player = Bukkit.getPlayer(uuid);
-            if (player != null) {
-                player.teleport(arena.getLobbySpawn());
-            }
+            plugin.getArenaManager().removePlayerTracking(uuid);
         }
         players.clear();
         playerPlotAssignments.clear();

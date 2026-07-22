@@ -12,6 +12,7 @@ import com.aspireserver.buildbattle.listeners.PlotToolListener;
 import com.aspireserver.buildbattle.listeners.PlayerListener;
 import com.aspireserver.buildbattle.mob.MobManager;
 import com.aspireserver.buildbattle.plot.FloorManager;
+import com.aspireserver.buildbattle.pro.ProToolManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class AspireBuildBattle extends JavaPlugin {
@@ -58,6 +59,8 @@ public final class AspireBuildBattle extends JavaPlugin {
 
         SpawnSetWaitingCommand waitingCmd = new SpawnSetWaitingCommand(this);
         getCommand("spawnsetwaiting").setExecutor(waitingCmd);
+        getCommand("spawnwaiting").setExecutor(waitingCmd);
+        getCommand("spawnwaiting").setTabCompleter(waitingCmd);
 
         TogglePlotTypeCommand toggleCmd = new TogglePlotTypeCommand(this);
         getCommand("togglesolo").setExecutor(toggleCmd);
@@ -79,6 +82,7 @@ public final class AspireBuildBattle extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PlayerListener(this), this);
         getServer().getPluginManager().registerEvents(new MobManager(this), this);
         getServer().getPluginManager().registerEvents(new FloorManager(this), this);
+        getServer().getPluginManager().registerEvents(new ProToolManager(this), this);
     }
 
     public static AspireBuildBattle getInstance() {

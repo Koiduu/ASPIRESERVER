@@ -1,0 +1,18 @@
+name: AspireBedwars
+version: '26.2'
+main: com.aspireserver.bedwars.AspireBedwars
+api-version: '1.21'
+author: AspireServer
+description: Hypixel-style Bedwars mini-game (single-world)
+softdepend: [OldCombatMechanics]
+
+commands:
+  bw:
+    description: Bedwars main command
+    usage: /bw
+    aliases: [bedwars]
+
+permissions:
+  bedwars.admin.setup:
+    description: Access to Bedwars setup and admin commands
+    default: op
